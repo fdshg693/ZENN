@@ -1,5 +1,5 @@
 ---
-title: "GitHub Copilot のプロンプト構造を徹底解析"
+title: "GitHub Copilotエージェントモードのプロンプト構造を徹底解析"
 emoji: "🤖"
 type: "tech"
 topics: ["AI", "LLM", "PromptEngineering", "GitHubCopilot", "GPT"]

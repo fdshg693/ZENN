@@ -18,3 +18,6 @@ published: true # 公開設定（falseにすると下書き）
 
 ## 記事をプレビューする
 `npx zenn preview`コマンドで、ローカルサーバーを立ち上げて記事のプレビューができる。
+
+本の雛形
+```npx zenn new:book```

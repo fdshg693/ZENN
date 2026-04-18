@@ -330,6 +330,10 @@ Claude Code のスキル機構は `skills/` 直下しかスキルとして認識
 
 Anthropic が繰り返し強調する **"do less, better"**（[Effective Context Engineering](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)）は、そのままこのレイヤー設計にも当てはまる。**モデルに渡す情報量を最小化するほど、モデルの性能は発揮される**。設定ファイルは「書けば書くほど賢くなる」ものではなく、「適切な層に、適切な粒度で置いたときだけ効く」ものだと捉えるのが、長く付き合うコツだと思う。
 
+## 関連記事
+
+-[MCPサーバーだけでは足りなかった ― Tavilyを"プロジェクト最適化"する3層構成](./use_tavily_skill.md)
+
 ## 参考文献・資料
 
 - Anthropic, [Building Effective Agents](https://www.anthropic.com/engineering/building-effective-agents)

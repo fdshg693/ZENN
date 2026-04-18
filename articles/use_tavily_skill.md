@@ -263,7 +263,7 @@ python ./.claude/skills/use-tavily/src/search_topic.py "Microsoft Fabric overvie
 
 ## 関連記事
 
-- [Claude Codeの設定はどこに書くべきか ― プロンプト・RULES・スキル・エージェントの使い分け](./claude-code-utilize-1.md)
+- [Claude Codeの設定はどこに書くべきか ― プロンプト・RULES・スキル・エージェントの使い分け](./claude-code-utilize-1)
 
 ## 参考
 

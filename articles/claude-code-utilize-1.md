@@ -332,7 +332,7 @@ Anthropic が繰り返し強調する **"do less, better"**（[Effective Context
 
 ## 関連記事
 
--[MCPサーバーだけでは足りなかった ― Tavilyを"プロジェクト最適化"する3層構成](./use_tavily_skill.md)
+-[MCPサーバーだけでは足りなかった ― Tavilyを"プロジェクト最適化"する3層構成](./use_tavily_skill)
 
 ## 参考文献・資料
 

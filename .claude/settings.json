@@ -2,22 +2,11 @@
   "hooks": {
     "PermissionRequest": [
       {
-        "matcher": "Edit",
+        "matcher": "Edit|Write",
         "hooks": [
           {
             "type": "command",
-            "if": "Edit(**/.claude/**)",
-            "command": "printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}'"
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "if": "Write(**/.claude/**)",
-            "command": "printf '%s\\n' '{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}'"
+            "command": "node .claude/hooks/auto-approve-claude-dir.mjs"
           }
         ]
       }

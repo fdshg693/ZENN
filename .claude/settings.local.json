@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(/.claude/skills/use-tavily/**)",
+      "Edit(/.claude/skills/zenn/**)"
+    ]
+  }
+}

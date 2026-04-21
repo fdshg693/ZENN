@@ -1,0 +1,129 @@
+{
+  "script": "search_extract_topic.py",
+  "request": {
+    "query": "API Gateway Lambda authorizer Cognito JWT authorizer REST HTTP API comparison",
+    "detail": "balanced",
+    "include_domains": [
+      "docs.aws.amazon.com"
+    ],
+    "exclude_domains": [],
+    "selected_url_limit": 20,
+    "search": {
+      "search_depth": "advanced",
+      "topic": "general",
+      "max_results": 5,
+      "chunks_per_source": 3,
+      "include_answer": false,
+      "include_raw_content": false,
+      "include_images": false,
+      "include_favicon": false,
+      "include_usage": false,
+      "timeout": 60.0
+    },
+    "extract": {
+      "extract_depth": "advanced",
+      "chunks_per_source": 3,
+      "format": "markdown",
+      "timeout": 60.0,
+      "include_images": false,
+      "include_favicon": false,
+      "include_usage": false
+    }
+  },
+  "environment": {
+    "dotenv_loaded": true,
+    "dotenv_path": "c:\\CodeRoot\\azure-weekly-study\\.env",
+    "api_key_present": true
+  },
+  "response": {
+    "search": {
+      "query": "API Gateway Lambda authorizer Cognito JWT authorizer REST HTTP API comparison",
+      "follow_up_questions": null,
+      "answer": null,
+      "images": [],
+      "results": [
+        {
+          "url": "https://docs.aws.amazon.com/pdfs/whitepapers/latest/best-practices-api-gateway-private-apis-integration/best-practices-api-gateway-private-apis-integration.pdf",
+          "title": "[PDF] Best Practices for Designing Amazon API Gateway Private APIs and ...",
+          "content": "Table 3 – Authorizations Authorization type Available API type Use case IAM REST, WebSocket, HTTP If clients have IAM user or role credentials, they can sign the request with IAM credentials.\nAmazon Cognito REST, WebSocket This is commonly used for web and mobile applicati ons where end users log in through Amazon Cognito user pools or federated identity providers.\nLambda REST, WebSocket, HTTP A Lambda authorizer enables developers to design a business logic around authorization. This can act as a JWT. authorizer, or validate other types of tokens.\nJWT HTTP The JWT authorizer is available only for HTTP APIs, and allows clients to pass a JWT token, including tokens from Amazon Cognito. [...] Private integration cross-account 24 Best Practices for Designing Amazon API Gateway Private APIs and Private Integration AWS Whitepaper Security Private APIs and private integration oﬀer an extra layer of security from a network standpoint, because communications are limited within a private network. However, malicious users can potentially gain access to private networks, so it’s a best practice to implement an authorizer for APIs. REST and WebSocket oﬀer the same set of authorizers, such as IAM, Amazon Cognito, and Lambda authorizers. Currently, HTTP APIs come with a JSON Web Token (JWT) authorizer.\nServerless Application Lens covers identity and access management in serverless API in depth. [...] REST APIs provide an easy means to secure APIs such as resource policies, IAM authentication, and custom authorizers.",
+          "score": 0.99993134,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-integrate-with-cognito.html",
+          "title": "Control access to REST APIs using Amazon Cognito user pools as an authorizer - Amazon API Gateway",
+          "content": "View a markdown version of this page\n\n# Control access to REST APIs using Amazon Cognito user pools as an authorizer\n\nAs an alternative to using IAM roles and policies or\nLambda authorizers (formerly\nknown as custom authorizers), you can use an Amazon Cognito user pool to\ncontrol who can access your API in Amazon API Gateway. [...] To use an Amazon Cognito user pool with your API, you must first create an authorizer of the\n`COGNITO_USER_POOLS` type and then configure an API method to use that\nauthorizer. After the API is deployed, the client must first sign the user in to the user\npool, obtain an identity or access token for the user, and then call the API method with one of\nthe tokens, which are typically set to the request's `Authorization` header. The\nAPI call succeeds only if the required token is supplied and the supplied token is valid,\notherwise, the client isn't authorized to make the call because the client did not have\ncredentials that could be authorized.\n\n`COGNITO_USER_POOLS`\n`Authorization` [...] `COGNITO_USER_POOLS`\n`Authorization`\n\nThe identity token is used to authorize API calls based on identity claims of the\nsigned-in user. The access token is used to authorize API calls based on the custom scopes\nof specified access-protected resources. For more information, see Using Tokens with User Pools and Resource Server and\nCustom Scopes.\n\nTo create and configure an Amazon Cognito user pool for your API, you perform the following\ntasks:\n\nUse the Amazon Cognito console, CLI/SDK, or API to create a user pool—or use one\nthat's owned by another AWS account.\n\nUse the API Gateway console, CLI/SDK, or API to create an API Gateway authorizer with the\nchosen user pool.\n\nUse the API Gateway console, CLI/SDK, or API to enable the authorizer on selected API\nmethods.",
+          "score": 0.99984765,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html",
+          "title": "Control access to HTTP APIs with JWT authorizers in API Gateway - Amazon API Gateway",
+          "content": "After validating the JWT, API Gateway passes the claims in the token to the API route’s integration. Backend resources, such as Lambda functions, can access the JWT claims. For example, if the JWT includes an identity claim `emailID`, it's available to a Lambda integration in `$event.requestContext.authorizer.jwt.claims.emailID`. For more information about the payload that API Gateway sends to Lambda integrations, see Create AWS Lambda proxy integrations for HTTP APIs in API Gateway.\n\n## Create a JWT authorizer\n\nBefore you create a JWT authorizer, you must register a client application with an identity provider. You must also have created an HTTP API. For examples of creating an HTTP API, see Create an HTTP API.\n\n### Create a JWT authorizer using the console [...] ### Create a JWT authorizer using the console\n\nThe following steps show how to create JWT authorizer using the console.\n\n###### To create a JWT authorizer using the console\n\n1. Sign in to the API Gateway console at .\n2. Choose an HTTP API.\n3. In the main navigation pane, choose Authorization.\n4. Choose the Manage authorizers tab.\n5. Choose Create.\n6. For Authorizer type, choose JWT.\n7. Configure your JWT authorizer, and specify an Identity source that defines the source of the token.\n8. Choose Create.\n\n#### Create a JWT authorizer using the AWS CLI\n\nThe following create-authorizer command creates a JWT authorizer. For `jwt-configuration`, specify the `Audience` and `Issuer` for your identity provider. If you use Amazon Cognito as an identity provider, the `IssuerUrl` is ` [...] ###### Note\n\nThere is no standard mechanism to differentiate JWT access tokens from other types of JWTs, such as OpenID Connect ID tokens. Unless you require ID tokens for API authorization, we recommend that you configure your routes to require authorization scopes. You can also configure your JWT authorizers to require issuers or audiences that your identity provider uses only when issuing JWT access tokens.\n\n## Authorizing API requests with a JWT authorizer\n\nAPI Gateway uses the following general workflow to authorize requests to routes that are configured to use a JWT authorizer.",
+          "score": 0.9995827,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html",
+          "title": "Choose between REST APIs and HTTP APIs - Amazon API Gateway",
+          "content": "Yes\n\nYes\n\nJSON Web Token (JWT) 2\n\nNo\n\nYes\n\n1 You can use Amazon Cognito with a JWT authorizer.\n\n2 You can use a Lambda authorizer to validate JWTs for REST APIs.\n\n## API management\n\nChoose REST APIs if you need API management capabilities such as API keys and per-client rate limiting.\nFor more information, see Distribute your REST APIs to clients in API Gateway, Custom domain name for public REST APIs in API Gateway, and\nCustom domain names for HTTP APIs in API Gateway.\n\n| Features | REST API | HTTP API |\n --- \n| Custom domains | Yes | Yes |\n| API keys | Yes | No |\n| Per-client rate limiting | Yes | No |\n| Per-client usage throttling | Yes | No |\n| Developer portal | Yes | No |\n\nCustom domains\n\nYes\n\nYes\n\nAPI keys\n\nYes\n\nNo\n\nPer-client rate limiting\n\nYes\n\nNo\n\nPer-client usage throttling [...] Mutual TLS authentication\n\nYes\n\nYes\n\nCertificates for backend authentication\n\nYes\n\nNo\n\nAWS WAF\n\nYes\n\nNo\n\n## Authorization\n\nAPI Gateway supports multiple mechanisms for controlling and managing access to your API. For more information, see\nControl and manage access to REST APIs in API Gateway and Control and manage access to HTTP APIs in API Gateway.\n\n| Authorization options | REST API | HTTP API |\n --- \n| IAM | Yes | Yes |\n| Resource policies | Yes | No |\n| Amazon Cognito | Yes | Yes 1 |\n| Custom authorization with an AWS Lambda function | Yes | Yes |\n| JSON Web Token (JWT) 2 | No | Yes |\n\nIAM\n\nYes\n\nYes\n\nResource policies\n\nYes\n\nNo\n\nAmazon Cognito\n\nYes\n\nYes 1\n\nCustom authorization with an AWS Lambda function\n\nYes\n\nYes\n\nJSON Web Token (JWT) 2\n\nNo\n\nYes [...] View a markdown version of this page\n\n# Choose between REST APIs and HTTP APIs\n\nREST APIs and HTTP APIs are both RESTful API products. REST APIs support more\nfeatures than HTTP APIs, while HTTP APIs are designed with minimal features so that they can be offered\nat a lower price. Choose REST APIs if you need features such as API keys, per-client throttling, request\nvalidation, AWS WAF integration, or private API endpoints. Choose HTTP APIs if you don't need the features\nincluded with REST APIs.\n\nThe following sections summarize core features that are available in REST APIs and\nHTTP APIs. When necessary, additional links are provided to navigate between the REST API and\nHTTP API sections of the API Gateway Developer Guide.\n\n## Endpoint type",
+          "score": 0.9995695,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/choosing-the-right-aws-service-for-your-microservice-endpoints/services-comparison.html",
+          "title": "AWS services comparison - AWS Prescriptive Guidance",
+          "content": "| Request and response transformation |  Limited capabilities.  You can use a fixed-response action to drop client requests and return a custom HTTP response and status code. |  Extensive capabilities.  You can modify requests and responses as needed. |  Not offered.  Implement transformations in the underlying Lambda function. |\n| Authentication and authorization | Native integration with Amazon Cognito and any OpenID compliant identity provider (IdP) for authentication. | Comprehensive capabilities, including IAM, Amazon Cognito, and Lambda authorizers for JSON Web Token (JWT) or a custom authorization scheme. | AWS Identity and Access Management (IAM) to authenticate and authorize requests based on the IAM principal's identity policy and the function's resource-based policy. | [...] |  |  |  |  |\n ---  --- |\n|  | Application Load Balancer | API Gateway | Lambda function URLs |\n| Primary use case |  Invoking a Lambda function directly over HTTPS from other AWS services or AWS accounts or from the public internet.  Ideal for simple use cases when your authentication and authorization requirements are minimal. |  Fully managed API management service to create, publish, maintain, monitor, and secure APIs.  Ideal for building and managing APIs, especially when advanced routing, authentication, and serverless integration are required. |  Invoking a Lambda function directly over HTTPS from other AWS services or AWS accounts or from the public internet.  Ideal for simple use cases when your authentication and authorization requirements are minimal. | [...] AWS services comparison - AWS Prescriptive Guidance\n\nDocumentationAWS Prescriptive GuidanceChoosing the right AWS service for your microservice endpoints\n\n# AWS services comparison\n\nThe following table compares key features of Application Load Balancer, Amazon API Gateway, and AWS Lambda function URLs for creating endpoints to support microservices.",
+          "score": 0.99804294,
+          "raw_content": null
+        }
+      ],
+      "response_time": 2.13,
+      "request_id": "b070a1db-3bb7-4c8d-9126-04b1a90df547"
+    },
+    "selected_urls": [
+      "https://docs.aws.amazon.com/pdfs/whitepapers/latest/best-practices-api-gateway-private-apis-integration/best-practices-api-gateway-private-apis-integration.pdf",
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-integrate-with-cognito.html",
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html",
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html",
+      "https://docs.aws.amazon.com/prescriptive-guidance/latest/choosing-the-right-aws-service-for-your-microservice-endpoints/services-comparison.html"
+    ],
+    "extract": {
+      "results": [
+        {
+          "url": "https://docs.aws.amazon.com/pdfs/whitepapers/latest/best-practices-api-gateway-private-apis-integration/best-practices-api-gateway-private-apis-integration.pdf",
+          "title": "[PDF] Best Practices for Designing Amazon API Gateway Private APIs and ...",
+          "raw_content": "Table 3 – Authorizations Authorization type Available API type Use case IAM REST, WebSocket, HTTP If clients have IAM user or role credentials, they can sign the request with IAM credentials.\nAmazon Cognito REST, WebSocket This is commonly used for web and mobile applicati ons where end users log in through Amazon Cognito user pools or federated identity providers.\nLambda REST, WebSocket, HTTP A Lambda authorizer enables developers to design a business logic around authorization. This can act as a JWT. authorizer, or validate other types of tokens.\nJWT HTTP The JWT authorizer is available only for HTTP APIs, and allows clients to pass a JWT token, including tokens from Amazon Cognito. [...] Private integration cross-account 24 Best Practices for Designing Amazon API Gateway Private APIs and Private Integration AWS Whitepaper Security Private APIs and private integration oﬀer an extra layer of security from a network standpoint, because communications are limited within a private network. However, malicious users can potentially gain access to private networks, so it’s a best practice to implement an authorizer for APIs. REST and WebSocket oﬀer the same set of authorizers, such as IAM, Amazon Cognito, and Lambda authorizers. Currently, HTTP APIs come with a JSON Web Token (JWT) authorizer.\nServerless Application Lens covers identity and access management in serverless API in depth. [...] • Route traﬃc through NLB instead of CLB or ALB.\n• This requires migration from CLB or ALB to NLB to shift traﬃc and redesign the existing architecture. Refer to Migrate your Classic Load Balancer for the migration process.\n• NLB listener type • Transmission control protocol (TCP) (Secure Socket Layer (SSL) passthrough or non-SSL traﬃc) • Transport Layer Security (TLS) (ending the SSL connection on NLB) Sample architecture patterns When implementing a private API, using an authorizer such as AWS Identity and Access Management (IAM) or Amazon Cognito is highly recommended. This ensures an additional layer of security, and helps verify requests using IAM credentials for IAM authorization, and access/ID tokens for the Amazon Cogito authorizer.",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html",
+          "title": "Control access to HTTP APIs with JWT authorizers in API Gateway",
+          "raw_content": "```\naws apigatewayv2 create-authorizer \\ --name authorizer-name \\ --api-id api-id \\ --authorizer-type JWT \\ --identity-source '$request.header.Authorization' \\ --jwt-configuration Audience=audience,Issuer=IssuerUrl\n```\n\n##### Create a JWT authorizer using AWS CloudFormation\n\nThe following CloudFormation template creates an HTTP API with a JWT authorizer that uses Amazon Cognito as an identity provider.\n\nThe output of the CloudFormation template is a URL for an Amazon Cognito hosted UI where clients can sign up and sign in to receive a JWT. After a client signs in, the client is redirected to your HTTP API with an access token in the URL. To invoke the API with the access token, change the `#` in the URL to a `?` to use the token as a query string parameter.\n\n```\n{{{{{{{{{{{{{{{\n``` [...] After validating the JWT, API Gateway passes the claims in the token to the API route’s integration. Backend resources, such as Lambda functions, can access the JWT claims. For example, if the JWT includes an identity claim `emailID`, it's available to a Lambda integration in `$event.requestContext.authorizer.jwt.claims.emailID`. For more information about the payload that API Gateway sends to Lambda integrations, see Create AWS Lambda proxy integrations for HTTP APIs in API Gateway.\n\n## Create a JWT authorizer\n\nBefore you create a JWT authorizer, you must register a client application with an identity provider. You must also have created an HTTP API. For examples of creating an HTTP API, see Create an HTTP API.\n\n### Create a JWT authorizer using the console [...] ### Create a JWT authorizer using the console\n\nThe following steps show how to create JWT authorizer using the console.\n\n###### To create a JWT authorizer using the console\n\n1. Sign in to the API Gateway console at .\n2. Choose an HTTP API.\n3. In the main navigation pane, choose Authorization.\n4. Choose the Manage authorizers tab.\n5. Choose Create.\n6. For Authorizer type, choose JWT.\n7. Configure your JWT authorizer, and specify an Identity source that defines the source of the token.\n8. Choose Create.\n\n#### Create a JWT authorizer using the AWS CLI\n\nThe following create-authorizer command creates a JWT authorizer. For `jwt-configuration`, specify the `Audience` and `Issuer` for your identity provider. If you use Amazon Cognito as an identity provider, the `IssuerUrl` is `",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/prescriptive-guidance/latest/choosing-the-right-aws-service-for-your-microservice-endpoints/services-comparison.html",
+          "title": "AWS services comparison - AWS Prescriptive Guidance",
+          "raw_content": "| Request and response transformation |  Limited capabilities.  You can use a fixed-response action to drop client requests and return a custom HTTP response and status code. |  Extensive capabilities.  You can modify requests and responses as needed. |  Not offered.  Implement transformations in the underlying Lambda function. |\n| Authentication and authorization | Native integration with Amazon Cognito and any OpenID compliant identity provider (IdP) for authentication. | Comprehensive capabilities, including IAM, Amazon Cognito, and Lambda authorizers for JSON Web Token (JWT) or a custom authorization scheme. | AWS Identity and Access Management (IAM) to authenticate and authorize requests based on the IAM principal's identity policy and the function's resource-based policy. | [...] |  |  |  |  |\n ---  --- |\n|  | Application Load Balancer | API Gateway | Lambda function URLs |\n| Primary use case |  Invoking a Lambda function directly over HTTPS from other AWS services or AWS accounts or from the public internet.  Ideal for simple use cases when your authentication and authorization requirements are minimal. |  Fully managed API management service to create, publish, maintain, monitor, and secure APIs.  Ideal for building and managing APIs, especially when advanced routing, authentication, and serverless integration are required. |  Invoking a Lambda function directly over HTTPS from other AWS services or AWS accounts or from the public internet.  Ideal for simple use cases when your authentication and authorization requirements are minimal. | [...] AWS services comparison - AWS Prescriptive Guidance\n\nDocumentationAWS Prescriptive GuidanceChoosing the right AWS service for your microservice endpoints\n\n# AWS services comparison\n\nThe following table compares key features of Application Load Balancer, Amazon API Gateway, and AWS Lambda function URLs for creating endpoints to support microservices.",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-integrate-with-cognito.html",
+          "title": "Control access to REST APIs using Amazon Cognito user pools as an authorizer",
+          "raw_content": "API Gateway HTTP APIs \n\n       \nDevelop \n\n           Routes\n           IP address types for HTTP APIs in API Gateway\n           \nAccess control \n\n               Lambda authorizers\n               JWT authorizers\n               IAM authorization\n\n           \nIntegrations \n\n               AWS Lambda integrations\n               HTTP integrations\n               \nAWS service integrations \n\n                   AWS service integrations reference\n\n               Private integrations\n\n           CORS\n           Parameter mapping\n           \nOpenAPI \n\n               Export\n\n       \nPublish \n\n           \nStages \n\n               Use stage variables for HTTP APIs in API Gateway\n               API Gateway stage variables reference for HTTP APIs in API Gateway [...] Security policy for HTTP APIs in API Gateway\n           \nCustom domain names \n\n               API mappings\n               Disable the default endpoint\n               IP address types for custom domain names for HTTP APIs\n\n       \nProtect \n\n           Throttling\n           Mutual TLS\n\n       \nMonitor \n\n           Metrics\n           \nLogging \n\n               Logging variables\n\n       \nTroubleshooting \n\n           Lambda integrations\n           JWT authorizers\n\n   \nAPI Gateway WebSocket APIs \n\n       \nOverview of WebSocket APIs \n\n           Manage connected users and client apps\n           Invoke your backend integration\n           WebSocket selection expressions\n\n       \nDevelop [...] Configure a Lambda authorizer\n                   Input to a Lambda authorizer\n                   Output from an API Gateway Lambda authorizer\n                   Call an API with Lambda authorizers\n                   Configure a cross-account Lambda authorizer\n                   Control access based on an identity’s attributes with Verified Permissions\n\n               \nUse Amazon Cognito user pool as authorizer for a REST API",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-vs-rest.html",
+          "title": "Choose between REST APIs and HTTP APIs",
+          "raw_content": "## Authorization\n\nAPI Gateway supports multiple mechanisms for controlling and managing access to your API. For more information, see Control and manage access to REST APIs in API Gateway and Control and manage access to HTTP APIs in API Gateway.\n\n| Authorization options | REST API | HTTP API |\n --- \n| IAM | Yes | Yes |\n| Resource policies | Yes | No |\n| Amazon Cognito | Yes | Yes 1 |\n| Custom authorization with an AWS Lambda function | Yes | Yes |\n| JSON Web Token (JWT)2 | No | Yes |\n\n1 You can use Amazon Cognito with a JWT authorizer.\n\n2 You can use a Lambda authorizer to validate JWTs for REST APIs.\n\n## API management [...] Configure a Lambda authorizer\n                   Input to a Lambda authorizer\n                   Output from an API Gateway Lambda authorizer\n                   Call an API with Lambda authorizers\n                   Configure a cross-account Lambda authorizer\n                   Control access based on an identity’s attributes with Verified Permissions\n\n               \nUse Amazon Cognito user pool as authorizer for a REST API [...] API Gateway HTTP APIs \n\n       \nDevelop \n\n           Routes\n           IP address types for HTTP APIs in API Gateway\n           \nAccess control \n\n               Lambda authorizers\n               JWT authorizers\n               IAM authorization\n\n           \nIntegrations \n\n               AWS Lambda integrations\n               HTTP integrations\n               \nAWS service integrations \n\n                   AWS service integrations reference\n\n               Private integrations\n\n           CORS\n           Parameter mapping\n           \nOpenAPI \n\n               Export\n\n       \nPublish \n\n           \nStages \n\n               Use stage variables for HTTP APIs in API Gateway\n               API Gateway stage variables reference for HTTP APIs in API Gateway",
+          "images": []
+        }
+      ],
+      "failed_results": [],
+      "response_time": 4.77,
+      "request_id": "020d782e-6db5-4d86-8e75-9f1e7e15e67f"
+    }
+  }
+}

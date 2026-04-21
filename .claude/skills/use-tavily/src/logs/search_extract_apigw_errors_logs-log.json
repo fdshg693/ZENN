@@ -1,0 +1,129 @@
+{
+  "script": "search_extract_topic.py",
+  "request": {
+    "query": "API Gateway handle Lambda errors mapping response logging CloudWatch access logs",
+    "detail": "balanced",
+    "include_domains": [
+      "docs.aws.amazon.com"
+    ],
+    "exclude_domains": [],
+    "selected_url_limit": 20,
+    "search": {
+      "search_depth": "advanced",
+      "topic": "general",
+      "max_results": 5,
+      "chunks_per_source": 3,
+      "include_answer": false,
+      "include_raw_content": false,
+      "include_images": false,
+      "include_favicon": false,
+      "include_usage": false,
+      "timeout": 60.0
+    },
+    "extract": {
+      "extract_depth": "advanced",
+      "chunks_per_source": 3,
+      "format": "markdown",
+      "timeout": 60.0,
+      "include_images": false,
+      "include_favicon": false,
+      "include_usage": false
+    }
+  },
+  "environment": {
+    "dotenv_loaded": true,
+    "dotenv_path": "c:\\CodeRoot\\azure-weekly-study\\.env",
+    "api_key_present": true
+  },
+  "response": {
+    "search": {
+      "query": "API Gateway handle Lambda errors mapping response logging CloudWatch access logs",
+      "follow_up_questions": null,
+      "answer": null,
+      "images": [],
+      "results": [
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html",
+          "title": "Set up CloudWatch logging for REST APIs in API Gateway - Amazon API Gateway",
+          "content": "## CloudWatch log formats for API Gateway\n\nThere are two types of API logging in CloudWatch: execution logging and access logging. In execution logging, API Gateway manages the CloudWatch Logs. The process includes creating log groups and log streams, and reporting to the log streams any caller's requests and responses.\n\nThe logged data includes errors or execution traces (such as request or response parameter values or payloads), data used by Lambda authorizers (formerly known as custom authorizers), whether API keys are required, whether usage plans are enabled, and other information. API Gateway redacts authorization headers, API key values, and similar sensitive request parameters from the logged data. [...] ## Set up CloudWatch API logging using CloudFormation\n\nUse the following example CloudFormation template to create an Amazon CloudWatch Logs log group and configure execution and access logging for a stage. To enable CloudWatch Logs, you must grant API Gateway permission to read and write logs to CloudWatch for your account. To learn more, see Associate account with IAM role in the AWS CloudFormation User Guide. [...] To improve your security posture, we recommend that you use execution logging at the `ERROR` or `INFO` level. You might need to do this to comply with various compliance frameworks. For more information, see Amazon API Gateway controls in the AWS Security Hub User Guide.\n\nWhen you deploy an API, API Gateway creates a log group and log streams under the log group. The log group is named following the `{{` format. Within each log group, the logs are further divided into log streams, which are ordered by Last Event Time as logged data is reported.",
+          "score": 0.80442166,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/handle-errors-in-lambda-integration.html",
+          "title": "Handle Lambda errors in API Gateway - Amazon API Gateway",
+          "content": "```\n{{\n```\n\nIn this output, `statusCode` is typically `4XX` for a client error and `5XX` for a server error. API Gateway handles these errors by mapping the Lambda error to an HTTP error response, according to the specified `statusCode`. For API Gateway to pass the error type (for example, `InvalidParameterException`), as part of the response to the client, the Lambda function must include a header (for example, `\"X-Amzn-ErrorType\":\"InvalidParameterException\"`) in the `headers` property.\n\n###### Topics\n\n Handle standard Lambda errors in API Gateway\n Handle custom Lambda errors in API Gateway\n\n## Handle standard Lambda errors in API Gateway\n\nA standard AWS Lambda error has the following format:\n\n```\n{\n``` [...] View a markdown version of this page\n\nHandle Lambda errors in API Gateway - Amazon API Gateway\n\nDocumentationAmazon API GatewayDeveloper Guide\n\nHandle standard Lambda errors in API GatewayHandle custom Lambda errors in API Gateway\n\n# Handle Lambda errors in API Gateway\n\nFor Lambda custom integrations, you must map errors returned by Lambda in the integration response to standard HTTP error responses for your clients. Otherwise, Lambda errors are returned as `200 OK` responses by default and the result is not intuitive for your API users.\n\nThere are two types of errors that Lambda can return: standard errors and custom errors. In your API, you must handle these differently.\n\nWith the Lambda proxy integration, Lambda is required to return an output of the following format:\n\n```\n{{\n``` [...] ```\n{\n```\n\nNote that the `errorType` and `stackTrace` property values are language-dependent. The standard error also applies to any error object that is an extension of the `Error` object or a subclass of the `Exception` class.\n\nTo map the standard Lambda error to a method response, you must first decide on an HTTP status code for a given Lambda error. You then set a regular expression pattern on the `selectionPattern` property of the IntegrationResponse associated with the given HTTP status code. In the API Gateway console, this `selectionPattern` is denoted as Lambda error regex in the Integration response section, under each integration response.\n\n###### Note",
+          "score": 0.68191797,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/lambda/latest/dg/services-apigateway-errors.html",
+          "title": "Handling Lambda errors with an API Gateway API",
+          "content": "View a markdown version of this page\n\nHandling Lambda errors with an API Gateway API - AWS Lambda\n\nDocumentationAWS LambdaDeveloper Guide\n\n# Handling Lambda errors with an API Gateway API\n\nAPI Gateway treats all invocation and function errors as internal errors. If the Lambda API rejects the invocation request, API Gateway returns a 500 error code. If the function runs but returns an error, or returns a response in the wrong format, API Gateway returns a 502. In both cases, the body of the response from API Gateway is `{`.\n\n###### Note\n\nAPI Gateway does not retry any Lambda invocations. If Lambda returns an error, API Gateway returns an error response to the client. [...] The following example shows an X-Ray trace map for a request that resulted in a function error and a 502 from API Gateway. The client receives the generic error message.\n\nTo customize the error response, you must catch errors in your code and format a response in the required format.\n\n###### Example index.mjs – Error formatting\n\n```\n{{{\n```\n\nAPI Gateway converts this response into an HTTP error with a custom status code and body. In the trace map, the function node is green because it handled the error.\n\nDocument Conventions\n\nTutorial\n\nAPI Gateway vs function URLs\n\nDid this page help you? - Yes\n\nThanks for letting us know we're doing a good job!\n\nIf you've got a moment, please tell us what we did right so we can do more of it.\n\nDid this page help you? - No",
+          "score": 0.65861565,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-logging-variables.html",
+          "title": "Customize HTTP API access logs - Amazon API Gateway",
+          "content": "| `$context.error.messageString` | The quoted value of `$context.error.message`, namely `\"$context.error.message\"`. |\n| `$context.error.responseType` | A type of `GatewayResponse`. For more information, see Monitor WebSocket API execution with CloudWatch metrics and Setting up gateway responses to customize error responses. |\n| `$context.extendedRequestId` | Equivalent to `$context.requestId`. |\n| `$context.httpMethod` | The HTTP method used. Valid values include: `DELETE`, `GET`, `HEAD`, `OPTIONS`, `PATCH`, `POST`, and `PUT`. |\n| `$context.identity.accountId` | The AWS account ID associated with the request. Supported for routes that use IAM authorization. | [...] | `$context.integration.error` | The error message returned from an integration. Equivalent to `$context.integrationErrorMessage`. |\n| `$context.integration.integrationStatus` | For Lambda proxy integration, the status code returned from AWS Lambda, not from the backend Lambda function code. |\n| `$context.integration.latency` | The integration latency in ms. Equivalent to `$context.integrationLatency`. |\n| `$context.integration.requestId` | The AWS endpoint's request ID. Equivalent to `$context.awsEndpointRequestId`. |\n| `$context.integration.status` | The status code returned from an integration. For Lambda proxy integrations, this is the status code that your Lambda function code returns. |\n| `$context.integrationErrorMessage` | A string that contains an integration error message. | [...] | `$context.integrationLatency` | The integration latency in ms. |\n| `$context.integrationStatus` | For Lambda proxy integration, this parameter represents the status code returned from AWS Lambda, not from the backend Lambda function. |\n| `$context.path` | The request path. For example, `{`. |\n| `$context.protocol` | The request protocol, for example, `HTTP/1.1`. Note  API Gateway APIs can accept HTTP/2 requests, but API Gateway sends requests to backend integrations using HTTP/1.1. As a result, the request protocol is logged as HTTP/1.1 even if a client sends a request that uses HTTP/2. |\n| `$context.requestId` | The ID that API Gateway assigns to the API request. |\n| `$context.requestTime` | The CLF-formatted request time (`dd/MMM/yyyy:HH:mm:ss +-hhmm`). |",
+          "score": 0.5194,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics.html",
+          "title": "Using CloudWatch metrics with Lambda",
+          "content": "Event poller scaling\n           Polling and stream positions\n           Consumer group ID\n           Event filtering\n           Schema registries with event sources\n           Low latency Apache Kafka\n           Retry configurations\n           Retain failed invocations\n           Kafka on-failure destination\n           Kafka ESM logging\n           Troubleshooting\n\n       \nAPI Gateway \n\n           Tutorial\n           Errors\n           API Gateway vs function URLs\n\n       Infrastructure Composer\n       CloudFormation\n       \nAmazon DocumentDB \n\n           Tutorial\n\n       \nDynamoDB \n\n           Create mapping\n           Batch item failures\n           Error handling\n           Stateful processing\n           Parameters\n           Event filtering\n           Tutorial [...] Metadata endpoint\n\n   \nInvoking functions \n\n       Invoke a function synchronously\n       \nAsynchronous invocation \n\n           Error handling\n           Configuration\n           Retaining records\n\n       Invocation\n       \nEvent source mappings \n\n           Event source mapping tags\n\n       Event filtering\n       Testing in console\n       Function states\n       Retries\n       Recursive loop detection\n       \nFunction URLs \n\n           Access control\n           Invoking function URLs\n           Monitoring function URLs\n           Function URLs vs Amazon API Gateway\n           Tutorial: Creating a webhook endpoint\n\n   \nFunction scaling \n\n       Configuring reserved concurrency\n       Configuring provisioned concurrency\n       Scaling behavior\n       Monitoring concurrency",
+          "score": 0.49377534,
+          "raw_content": null
+        }
+      ],
+      "response_time": 2.57,
+      "request_id": "1ae6eb1d-ed0e-42bb-9303-a129672c995f"
+    },
+    "selected_urls": [
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html",
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/handle-errors-in-lambda-integration.html",
+      "https://docs.aws.amazon.com/lambda/latest/dg/services-apigateway-errors.html",
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-logging-variables.html",
+      "https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics.html"
+    ],
+    "extract": {
+      "results": [
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html",
+          "title": "Set up CloudWatch logging for REST APIs in API Gateway",
+          "raw_content": "## CloudWatch log formats for API Gateway\n\nThere are two types of API logging in CloudWatch: execution logging and access logging. In execution logging, API Gateway manages the CloudWatch Logs. The process includes creating log groups and log streams, and reporting to the log streams any caller's requests and responses.\n\nThe logged data includes errors or execution traces (such as request or response parameter values or payloads), data used by Lambda authorizers (formerly known as custom authorizers), whether API keys are required, whether usage plans are enabled, and other information. API Gateway redacts authorization headers, API key values, and similar sensitive request parameters from the logged data. [...] `$context.requestId`\n:   This logs the value in the `x-amzn-RequestId` header. Clients can override the value in the `x-amzn-RequestId` header with a value in the format of a universally unique identifier (UUID). API Gateway returns this request ID in the `x-amzn-RequestId` response header. API Gateway replaces overridden request IDs that aren't in the format of a UUID with `UUID_REPLACED_INVALID_REQUEST_ID` in your access logs. [...] ## Set up CloudWatch API logging using CloudFormation\n\nUse the following example CloudFormation template to create an Amazon CloudWatch Logs log group and configure execution and access logging for a stage. To enable CloudWatch Logs, you must grant API Gateway permission to read and write logs to CloudWatch for your account. To learn more, see Associate account with IAM role in the AWS CloudFormation User Guide.",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/lambda/latest/dg/services-apigateway-errors.html",
+          "title": "Handling Lambda errors with an API Gateway API",
+          "raw_content": "[View a markdown version of this page](services-apigateway-errors.md)\n\nHandling Lambda errors with an API Gateway API - AWS Lambda\n\n[Documentation](/index.html)[AWS Lambda](/lambda/index.html)[Developer Guide](welcome.html)\n\n# Handling Lambda errors with an API Gateway API\n\nAPI Gateway treats all invocation and function errors as internal errors. If the Lambda API rejects the invocation request, API Gateway returns a 500 error code. If the function runs but returns an error, or returns a response in the wrong format, API Gateway returns a 502. In both cases, the body of the response from API Gateway is `{`.\n\n###### Note\n\nAPI Gateway does not retry any Lambda invocations. If Lambda returns an error, API Gateway returns an error response to the client.\n\nThe following example shows an X-Ray trace map for a request that resulted in a function error and a 502 from API Gateway. The client receives the generic error message.\n\nTo customize the error response, you must catch errors in your code and format a response in the required format.\n\n###### Example [index.mjs](https://github.com/awsdocs/aws-lambda-developer-guide/tree/main/sample-apps/nodejs-apig/function/index.mjs) – Error formatting\n\n```\n{{{\n```\n\nAPI Gateway converts this response into an HTTP error with a custom status code and body. In the trace map, the function node is green because it handled the error.\n\n[Document Conventions](/general/latest/gr/docconventions.html)\n\nTutorial\n\nAPI Gateway vs function URLs\n\nDid this page help you? - Yes\n\nThanks for letting us know we're doing a good job!\n\nIf you've got a moment, please tell us what we did right so we can do more of it.\n\nDid this page help you? - No\n\nThanks for letting us know this page needs work. We're sorry we let you down.\n\nIf you've got a moment, please tell us how we can make the documentation better.",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-logging-variables.html",
+          "title": "Customize HTTP API access logs - Amazon API Gateway",
+          "raw_content": "| `$context.error.messageString` | The quoted value of `$context.error.message`, namely `\"$context.error.message\"`. |\n| `$context.error.responseType` | A type of `GatewayResponse`. For more information, see Monitor WebSocket API execution with CloudWatch metrics and Setting up gateway responses to customize error responses. |\n| `$context.extendedRequestId` | Equivalent to `$context.requestId`. |\n| `$context.httpMethod` | The HTTP method used. Valid values include: `DELETE`, `GET`, `HEAD`, `OPTIONS`, `PATCH`, `POST`, and `PUT`. |\n| `$context.identity.accountId` | The AWS account ID associated with the request. Supported for routes that use IAM authorization. | [...] | `$context.integration.error` | The error message returned from an integration. Equivalent to `$context.integrationErrorMessage`. |\n| `$context.integration.integrationStatus` | For Lambda proxy integration, the status code returned from AWS Lambda, not from the backend Lambda function code. |\n| `$context.integration.latency` | The integration latency in ms. Equivalent to `$context.integrationLatency`. |\n| `$context.integration.requestId` | The AWS endpoint's request ID. Equivalent to `$context.awsEndpointRequestId`. |\n| `$context.integration.status` | The status code returned from an integration. For Lambda proxy integrations, this is the status code that your Lambda function code returns. |\n| `$context.integrationErrorMessage` | A string that contains an integration error message. | [...] | `$context.integrationLatency` | The integration latency in ms. |\n| `$context.integrationStatus` | For Lambda proxy integration, this parameter represents the status code returned from AWS Lambda, not from the backend Lambda function. |\n| `$context.path` | The request path. For example, `{`. |\n| `$context.protocol` | The request protocol, for example, `HTTP/1.1`. Note  API Gateway APIs can accept HTTP/2 requests, but API Gateway sends requests to backend integrations using HTTP/1.1. As a result, the request protocol is logged as HTTP/1.1 even if a client sends a request that uses HTTP/2. |\n| `$context.requestId` | The ID that API Gateway assigns to the API request. |\n| `$context.requestTime` | The CLF-formatted request time (`dd/MMM/yyyy:HH:mm:ss +-hhmm`). |",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics.html",
+          "title": "Using CloudWatch metrics with Lambda - AWS Documentation",
+          "raw_content": "Event poller scaling\n           Polling and stream positions\n           Consumer group ID\n           Event filtering\n           Schema registries with event sources\n           Low latency Apache Kafka\n           Retry configurations\n           Retain failed invocations\n           Kafka on-failure destination\n           Kafka ESM logging\n           Troubleshooting\n\n       \nAPI Gateway \n\n           Tutorial\n           Errors\n           API Gateway vs function URLs\n\n       Infrastructure Composer\n       CloudFormation\n       \nAmazon DocumentDB \n\n           Tutorial\n\n       \nDynamoDB \n\n           Create mapping\n           Batch item failures\n           Error handling\n           Stateful processing\n           Parameters\n           Event filtering\n           Tutorial [...] Metadata endpoint\n\n   \nInvoking functions \n\n       Invoke a function synchronously\n       \nAsynchronous invocation \n\n           Error handling\n           Configuration\n           Retaining records\n\n       Invocation\n       \nEvent source mappings \n\n           Event source mapping tags\n\n       Event filtering\n       Testing in console\n       Function states\n       Retries\n       Recursive loop detection\n       \nFunction URLs \n\n           Access control\n           Invoking function URLs\n           Monitoring function URLs\n           Function URLs vs Amazon API Gateway\n           Tutorial: Creating a webhook endpoint\n\n   \nFunction scaling \n\n       Configuring reserved concurrency\n       Configuring provisioned concurrency\n       Scaling behavior\n       Monitoring concurrency [...] Configure CloudWatch function logs\n               View function logs\n\n           Log with Firehose\n           Log with Amazon S3\n\n       CloudTrail logs\n       AWS X-Ray\n       Function insights\n       View application metrics\n       Application Signals\n       Debug with VS Code\n\n   \nLambda layers \n\n       Packaging layers\n       Creating and deleting layers\n       Adding layers\n       Layers with CloudFormation\n       Layers with AWS SAM\n\n   \nLambda extensions \n\n       Configuring extensions\n       Extensions partners\n       Extensions API\n       \nTelemetry API \n\n           API reference\n           Event schema reference\n           Converting events to OTel Spans\n           Logs API\n\n   \nTroubleshooting",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/handle-errors-in-lambda-integration.html",
+          "title": "Handle Lambda errors in API Gateway",
+          "raw_content": "Monitor \n\n           \nCloudWatch metrics \n\n               Amazon API Gateway dimensions and metrics\n               View metrics with the API dashboard\n               View metrics in the CloudWatch console\n               View log event in the CloudWatch console\n               Monitoring tools in AWS for API Gateway\n\n           CloudWatch logs\n           Firehose\n           Variables for access logging for API Gateway\n           \nX-Ray \n\n               Set up AWS X-Ray\n               Use AWS X-Ray service maps and trace views\n               Configure AWS X-Ray sampling rules\n               X-Ray traces\n\n   \nAPI Gateway portals \n\n       \nPortal product [...] In this output, `statusCode` is typically `4XX` for a client error and `5XX` for a server error. API Gateway handles these errors by mapping the Lambda error to an HTTP error response, according to the specified `statusCode`. For API Gateway to pass the error type (for example, `InvalidParameterException`), as part of the response to the client, the Lambda function must include a header (for example, `\"X-Amzn-ErrorType\":\"InvalidParameterException\"`) in the `headers` property.\n\n###### Topics\n\n   Handle standard Lambda errors in API Gateway\n\n   Handle custom Lambda errors in API Gateway\n\n## Handle standard Lambda errors in API Gateway\n\nA standard AWS Lambda error has the following format: [...] ```\n{\n    \"errorMessage\" : {\n        errorType : \"InternalServerError\",\n        httpStatus : 500,\n        requestId : context.awsRequestId,\n        trace : {\n            \"function\": \"abc()\",\n            \"line\": 123,\n            \"file\": \"abc.js\"\n        }\n    }\n};\n```\n\nDepending on your API requirements, you may need to pass some or all of the custom error properties as method response header parameters. You can achieve this by applying the custom error mappings from the integration response body to the method response headers.",
+          "images": []
+        }
+      ],
+      "failed_results": [],
+      "response_time": 4.5,
+      "request_id": "1207ac23-f0ba-4824-a23b-cc37935e33fe"
+    }
+  }
+}

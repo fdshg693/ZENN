@@ -1,0 +1,129 @@
+{
+  "script": "search_extract_topic.py",
+  "request": {
+    "query": "API Gateway quotas limits integration timeout 29 seconds payload size REST HTTP API",
+    "detail": "balanced",
+    "include_domains": [
+      "docs.aws.amazon.com"
+    ],
+    "exclude_domains": [],
+    "selected_url_limit": 20,
+    "search": {
+      "search_depth": "advanced",
+      "topic": "general",
+      "max_results": 5,
+      "chunks_per_source": 3,
+      "include_answer": false,
+      "include_raw_content": false,
+      "include_images": false,
+      "include_favicon": false,
+      "include_usage": false,
+      "timeout": 60.0
+    },
+    "extract": {
+      "extract_depth": "advanced",
+      "chunks_per_source": 3,
+      "format": "markdown",
+      "timeout": 60.0,
+      "include_images": false,
+      "include_favicon": false,
+      "include_usage": false
+    }
+  },
+  "environment": {
+    "dotenv_loaded": true,
+    "dotenv_path": "c:\\CodeRoot\\azure-weekly-study\\.env",
+    "api_key_present": true
+  },
+  "response": {
+    "search": {
+      "query": "API Gateway quotas limits integration timeout 29 seconds payload size REST HTTP API",
+      "follow_up_questions": null,
+      "answer": null,
+      "images": [],
+      "results": [
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-execution-service-limits-table.html",
+          "title": "Quotas for configuring and running a REST API in API Gateway - Amazon API Gateway",
+          "content": "\\ You can't set the integration timeout to less than 50 milliseconds. You can raise the integration timeout to greater than 29 seconds, but this might require a reduction in your Region-level throttle quota for your account.\n\n## Best practices to reduce your quotas\n\nThe following best practices might help reduce your current number of resources to avoid increasing your quota. Make sure that these suggestions work for your API's architecture.\n\nAPIs per Region\n:   To reduce the number of APIs per Region, export any unused APIs and then delete them from API Gateway. For more information, see Export a REST API from API Gateway.\n\nStages per API\n:   To reduce the number of stages per API, split up your API into multiple APIs. [...] | Integration timeout for private APIs | 50 milliseconds - 29 seconds for all integration types, including Lambda, Lambda proxy, HTTP, HTTP proxy, and AWS integrations. | Yes \\ |\n| Total combined size of all header values, including header names, values, any line terminators, and whitespaces | 10240 Bytes | No |\n| Total combined size of all header values for a private API | 8000 Bytes | No |\n| Payload size | 10 MB | No |\n| Tags per stage | 50 | No |\n| Number of iterations in a `#foreach ... #end` loop in mapping templates | 1000 | No |\n| Maximum mapping template size | 300 KB | No |\n| Access log template size | 3 KB | No | [...] | VPC links per account per Region | 20 | Yes |\n| API caching TTL | 300 seconds by default and configurable between 0 and 3600 by an API owner. | Not for the upper bound (3600) |\n| Cached response size | 1048576 Bytes. Cache data encryption may increase the size of the item that is being cached. | No |\n| Integration timeout for Regional APIs | 50 milliseconds - 29 seconds for all integration types, including Lambda, Lambda proxy, HTTP, HTTP proxy, and AWS integrations. | Yes \\ |\n| Integration timeout for edge-optimized APIs | 50 milliseconds - 29 seconds for all integration types, including Lambda, Lambda proxy, HTTP, HTTP proxy, and AWS integrations. | No |",
+          "score": 0.9999777,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html",
+          "title": "Throttle requests to your REST APIs for better throughput in API Gateway - Amazon API Gateway",
+          "content": "Per-account limits are applied to all APIs in an account in a specified Region. The account-level rate\nlimit can be increased upon request - higher limits are possible with APIs that have shorter timeouts and\nsmaller payloads. To request an increase of account-level throttling limits per Region, contact the AWS Support Center. For more information, see Amazon API Gateway quotas. Note that these limits can't be higher than the AWS throttling limits.\n\nPer-API, per-stage throttling limits are applied at the API method level for a stage. You\ncan configure the same settings for all methods, or configure different throttle settings for each method.\nNote that these limits can't be higher than the AWS throttling limits. [...] View a markdown version of this page\n\n# Throttle requests to your REST APIs for better throughput in API Gateway\n\nYou can configure throttling and quotas for your APIs to help protect them from being overwhelmed by too many\nrequests. Both throttles and quotas are applied on a best-effort basis and should be thought of as targets rather\nthan guaranteed request ceilings.\n\nAPI Gateway throttles requests to your API using the token bucket algorithm, where a token counts for a request.\nSpecifically, API Gateway examines the rate and a burst of request submissions against all APIs in your account, per\nRegion. In the token bucket algorithm, a burst can allow pre-defined overrun of those limits, but other factors can\nalso cause limits to be overrun in some cases. [...] ## Account-level throttling per Region\n\nBy default, API Gateway limits the steady-state requests per second (RPS) across all APIs within an AWS\naccount, per Region. It also limits the burst (that is, the maximum bucket size) across all APIs within an AWS\naccount, per Region. In API Gateway, the burst limit represents the target maximum number of concurrent request\nsubmissions that API Gateway will fulfill before returning `429 Too Many Requests` error responses. For more\ninformation on throttling quotas, see Amazon API Gateway quotas.\n\n`429 Too Many Requests`\n\n## Configuring API-level and stage-level throttling targets in a usage plan",
+          "score": 0.9998776,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/general/latest/gr/apigateway.html",
+          "title": "Amazon API Gateway endpoints and quotas - AWS General Reference",
+          "content": "| Maximum integration timeout in milliseconds | Each supported Region: 29,000 Milliseconds | Yes | The maximum integration timeout (in milliseconds) allowed for your account in the current region. This limit can only be increased for Regional and private APIs. |\n| Maximum resource policy size in bytes | Each supported Region: 8,192 | Yes | The maximum resource policy size in bytes you can have in this account in the current region. |\n| Method ARN Length | Each supported Region: 1,600 Bytes | No | ARN length of a method with authorization |\n| PortalProducts per Portal | Each supported Region: 200 | No | The maximum number of PortalProducts per Portal |\n| PortalProducts per account | Each supported Region: 500 | No | The maximum number of PortalProducts per account |",
+          "score": 0.99984396,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-quotas.html",
+          "title": "Quotas for configuring and running an HTTP API in API Gateway - Amazon API Gateway",
+          "content": "| Resource or operation | Default quota | Can be increased |\n --- \n| Routes per API | 300 | Yes |\n| Integrations per API | 300 | No |\n| Maximum integration timeout | 30 seconds | No |\n| Stages per API | 10 | Yes |\n| Multi-level API mappings per domain | 200 API mappings. This limit doesn't include API mapping with single levels, such as `/prod`. | No |\n| Tags per stage | 50 | No |\n| Total combined size of request line and header values | 10240 bytes | No |\n| Payload size | 10 MB | No |\n| Custom domains per account per Region | 120 | Yes |\n| Access log template size | 3 KB | No |\n| Amazon CloudWatch Logs log entry | 1 MB | No |\n| Authorizers per API | 10 | Yes  To increase this quota, contact the AWS Support Center |\n| Audiences per authorizer | 50 | No |\n| Scopes per route | 10 | No | [...] | Scopes per route | 10 | No |\n| Timeout for JSON Web Key Set endpoint | 1500 ms | No |\n| Response size from JSON Web Key Set endpoint | 150000 bytes | No |\n| Timeout for OpenID Connect discovery endpoint | 1500 ms | No |\n| Timeout for Lambda authorizer response | 10000 ms | No |\n| VPC links per account per Region | 10 | Yes |\n| Subnets per VPC link | 10 | Yes |\n| Stage variables per stage | 100 | No |\n| Length, in characters, of the key in a stage variable | 64 | No |\n| Length, in characters, of the value in a stage variable | 512 | No | [...] View a markdown version of this page\n\nQuotas for configuring and running an HTTP API in API Gateway - Amazon API Gateway\n\nDocumentationAmazon API GatewayDeveloper Guide\n\nBest practices to reduce your quotas\n\n# Quotas for configuring and running an HTTP API in API Gateway\n\nThe following quotas apply to configuring and running an HTTP API in Amazon API Gateway. If the quota is per-API, it can only be increased on specific APIs, not for all the APIs in an account. For information about account-level quotas see Amazon API Gateway quotas",
+          "score": 0.99979013,
+          "raw_content": null
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-execution-service-websocket-limits-table.html",
+          "title": "Quotas for configuring and running a WebSocket in API Gateway",
+          "content": "| Resource or operation | Default quota | Can be increased |\n --- \n| New connections per second per account (across all WebSocket APIs) per Region | 500 | Yes |\n| Concurrent connections | Not applicable  | Not applicable |\n| AWS Lambda authorizers per API | 10 | Yes To increase this quota, contact the AWS Support Center |\n| AWS Lambda authorizer result size | 8 KB | No |\n| Routes per API | 300 | Yes |\n| Integrations per API | 300 | Yes To increase this quota, contact the AWS Support Center |\n| Integration timeout | 50 milliseconds - 29 seconds for all integration types, including Lambda, Lambda proxy, HTTP, HTTP proxy, and AWS integrations. | No |\n| Stages per API | 10 | Yes |\n| WebSocket frame size | 32 KB | No |\n| Message payload size | 128 KB  | No | [...] | Message payload size | 128 KB  | No |\n| Maximum mapping template size | 300 KB | No |\n| Connection duration for WebSocket API | 2 hours | No |\n| Idle Connection Timeout | 10 minutes | No |\n| Length, in characters, of the URL for a WebSocket API | 4096 | No |\n| Access log template size | 3 KB | No | [...] API references\n   \nQuotas and important notes \n\n       REST API quotas\n       HTTP API quotas\n       Portal quotas\n       WebSocket API quotas\n       Important notes\n\n   Document history\n\n1.   Documentation \n2.   ...           \n3.   Amazon API Gateway \n4.   Developer Guide \n\n1.   Documentation \n2.   Amazon API Gateway \n3.   Developer Guide \n\n# Quotas for configuring and running a WebSocket in API Gateway\n\nPDF\n\nRSS\n\n- [x] Focus mode\n\n# Quotas for configuring and running a WebSocket in API Gateway - Amazon API Gateway\n\n\n\nDocumentationAmazon API GatewayDeveloper Guide",
+          "score": 0.99973875,
+          "raw_content": null
+        }
+      ],
+      "response_time": 2.58,
+      "request_id": "d69943f6-d27c-4eb7-82c4-1d453007fe4d"
+    },
+    "selected_urls": [
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-execution-service-limits-table.html",
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html",
+      "https://docs.aws.amazon.com/general/latest/gr/apigateway.html",
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-quotas.html",
+      "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-execution-service-websocket-limits-table.html"
+    ],
+    "extract": {
+      "results": [
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-execution-service-limits-table.html",
+          "title": "Quotas for configuring and running a REST API in API Gateway",
+          "raw_content": "| Integration timeout for private APIs | 50 milliseconds - 29 seconds for all integration types, including Lambda, Lambda proxy, HTTP, HTTP proxy, and AWS integrations. | Yes \\ |\n| Total combined size of all header values, including header names, values, any line terminators, and whitespaces | 10240 Bytes | No |\n| Total combined size of all header values for a private API | 8000 Bytes | No |\n| Payload size | 10 MB | No |\n| Tags per stage | 50 | No |\n| Number of iterations in a `#foreach ... #end` loop in mapping templates | 1000 | No |\n| Maximum mapping template size | 300 KB | No |\n| Access log template size | 3 KB | No | [...] \\ You can't set the integration timeout to less than 50 milliseconds. You can raise the integration timeout to greater than 29 seconds, but this might require a reduction in your Region-level throttle quota for your account.\n\n## Best practices to reduce your quotas\n\nThe following best practices might help reduce your current number of resources to avoid increasing your quota. Make sure that these suggestions work for your API's architecture.\n\nAPIs per Region\n:   To reduce the number of APIs per Region, export any unused APIs and then delete them from API Gateway. For more information, see Export a REST API from API Gateway.\n\nStages per API\n:   To reduce the number of stages per API, split up your API into multiple APIs. [...] | VPC links per account per Region | 20 | Yes |\n| API caching TTL | 300 seconds by default and configurable between 0 and 3600 by an API owner. | Not for the upper bound (3600) |\n| Cached response size | 1048576 Bytes. Cache data encryption may increase the size of the item that is being cached. | No |\n| Integration timeout for Regional APIs | 50 milliseconds - 29 seconds for all integration types, including Lambda, Lambda proxy, HTTP, HTTP proxy, and AWS integrations. | Yes \\ |\n| Integration timeout for edge-optimized APIs | 50 milliseconds - 29 seconds for all integration types, including Lambda, Lambda proxy, HTTP, HTTP proxy, and AWS integrations. | No |",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/general/latest/gr/apigateway.html",
+          "title": "Amazon API Gateway endpoints and quotas - AWS General Reference",
+          "raw_content": "| Maximum integration timeout in milliseconds | Each supported Region: 29,000 Milliseconds | Yes | The maximum integration timeout (in milliseconds) allowed for your account in the current region. This limit can only be increased for Regional and private APIs. |\n| Maximum resource policy size in bytes | Each supported Region: 8,192 | Yes | The maximum resource policy size in bytes you can have in this account in the current region. |\n| Method ARN Length | Each supported Region: 1,600 Bytes | No | ARN length of a method with authorization |\n| PortalProducts per Portal | Each supported Region: 200 | No | The maximum number of PortalProducts per Portal |\n| PortalProducts per account | Each supported Region: 500 | No | The maximum number of PortalProducts per account | [...] | Name | Default | Adjustable | Description |\n ---  --- |\n| API Payload Size | Each supported Region: 10 Megabytes | No | Maximum payload size for non WebSocket API. |\n| API Stage throttles in a usage plan | Each supported Region: 20 | Yes | The maximum number of API-stage throttle settings you can create in a usage plan in this account in the current region |\n| API keys | Each supported Region: 10,000 | No | The maximum number of API keys that you can create in this account in the current region |\n| AWS Lambda authorizer result size | Each supported Region: 8 Kilobytes | No | The maximum size of AWS Lambda authorizer result. |\n| Client certificates | Each supported Region: 60 | Yes | The maximum number of certificates that you can associate with this account in the current region | [...] | Usage plans | Each supported Region: 300 | Yes | The maximum number of usage plans that you can create in this account in the current region |\n| Usage plans per API key | Each supported Region: 10 | Yes | The maximum number of usage plans that you can associate with an API key |\n| VPC links | Each supported Region: 20 | Yes | The maximum number of VPC links that you can create in this account in the current region |\n| VPC links(V2) | Each supported Region: 10 | Yes | The maximum number of V2 VPC links that you can create in this account in the current Region |\n| WebSocket Idle Connection Timeout | Each supported Region: 600 Seconds | No | WebSocket API idle connection timeout. |\n| WebSocket frame size | Each supported Region: 32 Kilobytes | No | Maximum WebSocket frame size. |",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-execution-service-websocket-limits-table.html",
+          "title": "Quotas for configuring and running a WebSocket in API Gateway",
+          "raw_content": "| Resource or operation | Default quota | Can be increased |\n --- \n| New connections per second per account (across all WebSocket APIs) per Region | 500 | Yes |\n| Concurrent connections | Not applicable  | Not applicable |\n| AWS Lambda authorizers per API | 10 | Yes To increase this quota, contact the AWS Support Center |\n| AWS Lambda authorizer result size | 8 KB | No |\n| Routes per API | 300 | Yes |\n| Integrations per API | 300 | Yes To increase this quota, contact the AWS Support Center |\n| Integration timeout | 50 milliseconds - 29 seconds for all integration types, including Lambda, Lambda proxy, HTTP, HTTP proxy, and AWS integrations. | No |\n| Stages per API | 10 | Yes |\n| WebSocket frame size | 32 KB | No |\n| Message payload size | 128 KB  | No | [...] | Message payload size | 128 KB  | No |\n| Maximum mapping template size | 300 KB | No |\n| Connection duration for WebSocket API | 2 hours | No |\n| Idle Connection Timeout | 10 minutes | No |\n| Length, in characters, of the URL for a WebSocket API | 4096 | No |\n| Access log template size | 3 KB | No | [...] DocumentationAmazon API GatewayDeveloper Guide\n\nThe following quotas apply to configuring and running a WebSocket API in Amazon API Gateway. If the quota is per-API, it can only be increased on specific APIs, not for all the APIs in an account. For information about account-level quotas see Amazon API Gateway quotas",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-quotas.html",
+          "title": "Quotas for configuring and running an HTTP API in API Gateway",
+          "raw_content": "| Resource or operation | Default quota | Can be increased |\n --- \n| Routes per API | 300 | Yes |\n| Integrations per API | 300 | No |\n| Maximum integration timeout | 30 seconds | No |\n| Stages per API | 10 | Yes |\n| Multi-level API mappings per domain | 200 API mappings. This limit doesn't include API mapping with single levels, such as `/prod`. | No |\n| Tags per stage | 50 | No |\n| Total combined size of request line and header values | 10240 bytes | No |\n| Payload size | 10 MB | No |\n| Custom domains per account per Region | 120 | Yes |\n| Access log template size | 3 KB | No |\n| Amazon CloudWatch Logs log entry | 1 MB | No |\n| Authorizers per API | 10 | Yes To increase this quota, contact the AWS Support Center |\n| Audiences per authorizer | 50 | No |\n| Scopes per route | 10 | No | [...] | Scopes per route | 10 | No |\n| Timeout for JSON Web Key Set endpoint | 1500 ms | No |\n| Response size from JSON Web Key Set endpoint | 150000 bytes | No |\n| Timeout for OpenID Connect discovery endpoint | 1500 ms | No |\n| Timeout for Lambda authorizer response | 10000 ms | No |\n| VPC links per account per Region | 10 | Yes |\n| Subnets per VPC link | 10 | Yes |\n| Stage variables per stage | 100 | No |\n| Length, in characters, of the key in a stage variable | 64 | No |\n| Length, in characters, of the value in a stage variable | 512 | No | [...] Best practices to reduce your quotas\n\nThe following quotas apply to configuring and running an HTTP API in Amazon API Gateway. If the quota is per-API, it can only be increased on specific APIs, not for all the APIs in an account. For information about account-level quotas see Amazon API Gateway quotas",
+          "images": []
+        },
+        {
+          "url": "https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html",
+          "title": "Throttle requests to your REST APIs for better throughput in API Gateway",
+          "raw_content": "Per-account limits are applied to all APIs in an account in a specified Region. The account-level rate limit can be increased upon request - higher limits are possible with APIs that have shorter timeouts and smaller payloads. To request an increase of account-level throttling limits per Region, contact the AWS Support Center. For more information, see Amazon API Gateway quotas. Note that these limits can't be higher than the AWS throttling limits.\n\n   Per-API, per-stage throttling limits are applied at the API method level for a stage. You can configure the same settings for all methods, or configure different throttle settings for each method. Note that these limits can't be higher than the AWS throttling limits. [...] ## Account-level throttling per Region\n\nBy default, API Gateway limits the steady-state requests per second (RPS) across all APIs within an AWS account, per Region. It also limits the burst (that is, the maximum bucket size) across all APIs within an AWS account, per Region. In API Gateway, the burst limit represents the target maximum number of concurrent request submissions that API Gateway will fulfill before returning `429 Too Many Requests` error responses. For more information on throttling quotas, see Amazon API Gateway quotas.\n\n## Configuring API-level and stage-level throttling targets in a usage plan [...] API references\n   \nQuotas and important notes \n\n       REST API quotas\n       HTTP API quotas\n       Portal quotas\n       WebSocket API quotas\n       Important notes\n\n   Document history\n\n1.   Documentation \n2.   ...           \n3.   Amazon API Gateway \n4.   Developer Guide \n\n1.   Documentation \n2.   Amazon API Gateway \n3.   Developer Guide \n\n# Throttle requests to your REST APIs for better throughput in API Gateway\n\nPDF\n\nRSS\n\n- [x] Focus mode\n\n# Throttle requests to your REST APIs for better throughput in API Gateway - Amazon API Gateway\n\n\n\nDocumentationAmazon API GatewayDeveloper Guide",
+          "images": []
+        }
+      ],
+      "failed_results": [],
+      "response_time": 5.72,
+      "request_id": "1951f9b4-fd80-4b34-9df1-5e97ebe1e37d"
+    }
+  }
+}

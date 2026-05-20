@@ -244,7 +244,7 @@ API Gateway と Lambda は、リクエスト検証・認可・スロットリン
 
 ## 7. サーバーレス関数の罠を AWS ではどう解決するか
 
-[別記事「サーバーレス関数の実践ガイド」](/articles/serverless_functions_practical_guide.md)で扱った、サーバーレス関数に共通する落とし穴(Cold Start、ステートレス/マルチインスタンス、DB 接続爆発、FD 上限、冪等性、`/tmp` ephemeral storage)を、API Gateway + Lambda 構成ではどの AWS 製品で解決するかの対応表です。
+[別記事「サーバーレス関数の実践ガイド」](./serverless_functions_practical_guide.md)で扱った、サーバーレス関数に共通する落とし穴(Cold Start、ステートレス/マルチインスタンス、DB 接続爆発、FD 上限、冪等性、`/tmp` ephemeral storage)を、API Gateway + Lambda 構成ではどの AWS 製品で解決するかの対応表です。
 
 | 元記事の問題 | AWS での解決手段 |
 |---|---|

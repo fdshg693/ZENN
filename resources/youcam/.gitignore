@@ -1,0 +1,11 @@
+.env
+temp
+logs
+
+node_modules
+dist
+
+__pycache__
+*.pyc
+
+public/

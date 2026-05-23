@@ -1,0 +1,104 @@
+/* ImportExport.module.css — 機能F: export/import の2区画パネル。SourcePanel/RoutinePanel と同じ凝らない可読性。 */
+
+.panel {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  max-width: 480px;
+  margin-top: 1rem;
+}
+
+.heading {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.note {
+  margin: 0 0 0.75rem;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.block {
+  padding: 0.75rem 0;
+  border-top: 1px solid #eee;
+}
+
+.subheading {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.primary {
+  padding: 0.45rem 1.1rem;
+  border: 1px solid #1f6feb;
+  border-radius: 6px;
+  background: #1f6feb;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.secondary {
+  padding: 0.45rem 1.1rem;
+  border: 1px solid #1f6feb;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f6feb;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.primary:disabled,
+.secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #444;
+  margin-bottom: 0.6rem;
+}
+
+.textarea {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8rem;
+  padding: 0.4rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  resize: vertical;
+}
+
+.hint {
+  margin: 0.6rem 0 0;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.error {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 0.85rem;
+}
+
+.notice {
+  margin: 0.75rem 0 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: #eef7ee;
+  color: #1e7a32;
+  font-size: 0.85rem;
+}

@@ -1,0 +1,94 @@
+/* SkinResultView.module.css — 診断結果（総合点・項目別バー・マスクサムネ）の最低限の可読性。 */
+
+.root {
+  margin: 0.2rem 0;
+}
+
+.summary {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.summaryValue {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1f6feb;
+  line-height: 1.1;
+}
+
+.summaryLabel {
+  font-size: 0.72rem;
+  color: #888;
+}
+
+.scoreList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.scoreRow {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr 2.2rem;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.scoreName {
+  font-size: 0.8rem;
+  color: #444;
+}
+
+.barTrack {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: #eee;
+  overflow: hidden;
+}
+
+.barFill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #69b3ff, #1f6feb);
+  border-radius: 999px;
+}
+
+.scoreValue {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #333;
+  text-align: right;
+}
+
+/* マスクサムネは行をまたいで全幅に並べる。 */
+.masks {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.1rem 0 0.2rem;
+}
+
+.mask {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  background: #f6f8fa;
+}
+
+.empty {
+  font-size: 0.8rem;
+  color: #888;
+}

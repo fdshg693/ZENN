@@ -1,0 +1,149 @@
+/* MakeupEditor.module.css — 凝らない最低限の可読性だけ確保（README スコープ）。 */
+
+.block {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  max-width: 480px;
+  margin-top: 1rem;
+}
+
+.blockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.note {
+  margin: 0.25rem 0;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.error {
+  margin: 0.25rem 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 0.8rem;
+}
+
+.effectCard {
+  border: 1px solid #eee;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  margin: 0.5rem 0;
+  background: #fafafa;
+}
+
+.effectHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.effectTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.78rem;
+  color: #444;
+}
+
+.field input,
+.field select {
+  font-size: 0.85rem;
+  padding: 0.2rem;
+}
+
+.field input[type='color'] {
+  padding: 0;
+  height: 1.8rem;
+  width: 100%;
+}
+
+.paletteCard {
+  grid-column: 1 / -1;
+  border: 1px dashed #ddd;
+  border-radius: 6px;
+  padding: 0.5rem 0.6rem;
+  margin-top: 0.3rem;
+}
+
+.paletteTitle {
+  font-size: 0.78rem;
+  color: #666;
+  margin-bottom: 0.3rem;
+}
+
+.addRow {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-top: 0.6rem;
+}
+
+.addRow select {
+  flex: 1;
+  font-size: 0.85rem;
+  padding: 0.25rem;
+}
+
+.button {
+  padding: 0.3rem 0.8rem;
+  border: 1px solid #1f6feb;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f6feb;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.removeBtn {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #b3261e;
+  cursor: pointer;
+  font-size: 0.78rem;
+}
+
+.thumbnail {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+  margin-top: 0.2rem;
+}
+
+.addBlockButton {
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #1f6feb;
+  border-radius: 6px;
+  background: #1f6feb;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 1rem;
+}

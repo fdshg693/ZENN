@@ -1,0 +1,110 @@
+/* SourcePanel.module.css — 凝らない最低限の可読性だけ確保（README スコープ）。 */
+
+.panel {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  max-width: 480px;
+}
+
+.heading {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+.note {
+  margin: 0 0 0.75rem;
+  color: #666;
+  font-size: 0.85rem;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.tab,
+.tabActive {
+  flex: 1;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f7f7f7;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.tabActive {
+  background: #1f6feb;
+  border-color: #1f6feb;
+  color: #fff;
+}
+
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: #444;
+}
+
+.label input {
+  font-size: 0.9rem;
+  padding: 0.3rem;
+}
+
+.applyButton {
+  align-self: flex-start;
+  padding: 0.35rem 0.9rem;
+  border: 1px solid #1f6feb;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f6feb;
+  cursor: pointer;
+}
+
+.error {
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 0.85rem;
+}
+
+.preview {
+  margin: 0.75rem 0 0;
+}
+
+.previewImage {
+  max-width: 100%;
+  max-height: 320px;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  display: block;
+}
+
+.caption {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: #666;
+  word-break: break-all;
+}
+
+.placeholder {
+  margin: 0.75rem 0 0;
+  padding: 1.5rem;
+  text-align: center;
+  color: #999;
+  border: 1px dashed #ddd;
+  border-radius: 6px;
+  font-size: 0.85rem;
+}

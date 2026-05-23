@@ -1,0 +1,152 @@
+/* LookEditor.module.css — テンプレ一覧（サムネ選択）の最低限の可読性（MakeupEditor と同トーン）。 */
+
+.block {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  max-width: 480px;
+  margin-top: 1rem;
+}
+
+.blockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.note {
+  margin: 0.25rem 0;
+  color: #666;
+  font-size: 0.8rem;
+}
+
+.error {
+  margin: 0.25rem 0;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #b3261e;
+  font-size: 0.8rem;
+}
+
+.group {
+  margin-top: 0.4rem;
+  border-top: 1px solid #eee;
+}
+
+/* カテゴリ見出し＝開閉トグル（行全体がクリック領域）。 */
+.groupHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  width: 100%;
+  padding: 0.45rem 0.2rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: #333;
+}
+
+.groupHeader:hover {
+  background: #f6f8fa;
+}
+
+.chevron {
+  color: #888;
+  font-size: 0.7rem;
+  width: 0.9rem;
+}
+
+.groupName {
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.groupCount {
+  font-size: 0.72rem;
+  color: #888;
+  background: #eee;
+  border-radius: 999px;
+  padding: 0.02rem 0.45rem;
+}
+
+/* 選択中のルックを含むカテゴリの目印。 */
+.selectedDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #1f6feb;
+}
+
+.grid {
+  margin-bottom: 0.5rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 0.5rem;
+}
+
+.card,
+.cardSelected {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  padding: 0.3rem;
+  border-radius: 6px;
+  background: #fafafa;
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+}
+
+.card {
+  border: 1px solid #e2e2e2;
+}
+
+.cardSelected {
+  border: 2px solid #1f6feb;
+  background: #eef4ff;
+}
+
+.thumb,
+.thumbPlaceholder {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+.thumbPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f0f0f0;
+  color: #999;
+  font-size: 0.72rem;
+}
+
+.cardTitle {
+  font-size: 0.74rem;
+  color: #333;
+  word-break: break-word;
+  line-height: 1.25;
+}
+
+.removeBtn {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #fff;
+  color: #b3261e;
+  cursor: pointer;
+  font-size: 0.78rem;
+}

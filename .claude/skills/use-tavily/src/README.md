@@ -15,7 +15,7 @@
   - Tavily クライアント生成
   - JSON 出力整形
   - 共通のレスポンス整形
-  - **戻り値の契約**(`ExitCode` / `ResultKind` / `ResultEnvelope` / `ResponseEnvelope` / `RunOutcome` / `finalize()`)。終了コードと出力形状はここの列挙/`TypedDict`/`dataclass` が正本(詳細は後述の「実行結果の戻り値(契約)」)
+  - **戻り値の契約**(`ExitCode` / `ResultKind` / `ResultEnvelope` / `ResponseEnvelope` / `OutputChannel` / `RunOutcome` / `emit()` / `finalize()`)。終了コード・出力形状・出力先はここの列挙/`TypedDict`/`dataclass` が正本(詳細は後述の「実行結果の戻り値(契約)」)
 - 各スクリプトにはファイル冒頭コメントを書き、用途・最小引数・どこを編集すれば挙動を変えられるかを明示する
 - スクリプトの詳細な引数や最新の使い方は各スクリプトの `--help` を確認する
 
@@ -47,7 +47,7 @@ python ./.claude/skills/use-tavily/src/search_topic.py --help
 
 ## 実行結果の戻り値(契約)
 
-CLI の戻り値は **2 つのチャネル** に分かれ、いずれも `tavily_common.py` の型/列挙で固定しています。コメントではなく実体(`IntEnum` / `TypedDict` / `dataclass`)が正本で、この表はその写しです。
+CLI の戻り値は **終了コード・出力データ・監査ログ・出力先** の 4 つの契約に分かれ、いずれも `tavily_common.py` の型/列挙で固定しています。コメントではなく実体(`IntEnum` / `Enum` / `TypedDict` / `dataclass`)が正本で、この表はその写しです。
 
 ### 内部構造 — functional core / imperative shell
 
@@ -94,19 +94,37 @@ if __name__ == "__main__":
 
 | スクリプト | `result_kind` | `result` の中身 |
 |-----------|---------------|----------------|
-| `search_topic.py` | `search_results` | `list[dict]`: Tavily search の結果オブジェクト |
-| `extract_url_content.py` | `extract_results` | `list[dict]`: Tavily extract の結果オブジェクト |
-| `crawl_site_content.py` | `crawl_results` | `list[dict]`: Tavily crawl の結果オブジェクト |
-| `map_site_titles.py` | `site_pages` | `list[dict]`: ページタイトル記録(`PageTitleResult`) |
-| `map_extract_site_content.py` | `extract_results` | `list[dict]`: extract 結果(URL 0 件なら空配列) |
-| `search_extract_topic.py` | `extract_results` | `list[dict]`: extract 結果(URL 0 件なら空配列) |
-| `research_topic.py` | `research_report` | `str | dict`: レポート本文(markdown)、無ければ最終レスポンス全体 |
+| `search_topic.py` | `search_results` | `list[SearchResultItem]`: Tavily search の結果オブジェクト |
+| `extract_url_content.py` | `extract_results` | `list[ExtractResultItem]`: Tavily extract の結果オブジェクト |
+| `crawl_site_content.py` | `crawl_results` | `list[CrawlResultItem]`: Tavily crawl の結果オブジェクト |
+| `map_site_titles.py` | `site_pages` | `list[SitePageItem]`: ページタイトル記録(`PageTitleResult`) |
+| `map_extract_site_content.py` | `extract_results` | `list[ExtractResultItem]`: extract 結果(URL 0 件なら空配列) |
+| `search_extract_topic.py` | `extract_results` | `list[ExtractResultItem]`: extract 結果(URL 0 件なら空配列) |
+| `research_topic.py` | `research_report` | `str`: レポート本文(markdown)。失敗時のみ最終レスポンス dict 全体 |
 
 > 後段で結果を読むときは、トップレベルの `result` を取り出してから中身を処理する。`exit_code` を見れば、ファイル単体でも成功/空/未完了が判別できる。
+
+各 `*Item` は `tavily_common.py` の `TypedDict` で **実際の API レスポンスから実測して確定** させた型です(ドキュメントではなく実体が正本)。スクリプトの固定フラグ(`include_raw_content` / `include_images` / `include_favicon` はすべて False)前提なので、例えば search は `raw_content` キーを常に持つが値は `None`、extract は未ドキュメントの `title` を必ず持つ、といった実測事実を反映しています。
+
+- 型を **どう実測して確定したか**(プローブ各種・fixtures 再生成)→ [../experiments/README.md](../experiments/README.md)
+- 型が **実 API と一致することの検証**(オフライン構造検証 + `TAVILY_LIVE_TESTS=1` のライブ再検証)→ [../tests/README.md](../tests/README.md)
 
 ### 3. 監査ログ — `ResponseEnvelope`(常時)
 
 `--output` の有無にかかわらず、毎回 `logs/<script>-log.json` にリクエスト/レスポンス全体を `{script, request, environment, response}` の形で残します。再現・原因追跡用の詳細ビューで、出力エンベロープよりも冗長です。
+
+### 4. 出力先 — `OutputChannel`(どのストリーム/ファイルに何が出るか)
+
+上の 1〜3 が **何を** 返すかなら、これは **どこへ** 出すかの契約です。全出力は唯一のシンク `emit(channel, ...)` を通り、`OutputChannel` で行先が決まります。これにより「どこからどこまでが結果で、どこからが通知か」が一意になります。
+
+| メンバー | 中身 | 行先 | 構造化 |
+|---------|------|------|--------|
+| `RESULT_STDOUT` | `ResultEnvelope` JSON | stdout(`--output` 未指定時のみ) | あり |
+| `RESULT_FILE` | `ResultEnvelope` JSON | `--output` のパス | あり |
+| `AUDIT_LOG` | `ResponseEnvelope` JSON | `logs/<script>-log.json`(常時) | あり |
+| `DIAGNOSTIC` | 「Wrote ...」「Research finished ...」等の 1 行 | stderr | なし |
+
+規律: **stdout には機械可読な `ResultEnvelope` だけ(または何も出さない)。「Wrote ...」等の通知・エラー・進捗はすべて stderr の `DIAGNOSTIC`。** 後段で結果をパースするときは stdout をそのまま読めばよく、stderr は純粋な診断として扱える。`emit()` 以外の場所で `print` しない(出力点を一箇所に集約する)ことがこの契約を成立させています。
 
 ## どのスクリプトを使うか
 
@@ -127,7 +145,7 @@ if __name__ == "__main__":
 ```text
 src/
 ├── README.md                    ← このファイル(Python コードの説明)
-├── tavily_common.py             ← .env 読込、クライアント生成、JSON 整形、戻り値契約(ExitCode/ResultKind/各 Envelope/RunOutcome/finalize)
+├── tavily_common.py             ← .env 読込、クライアント生成、JSON 整形、戻り値契約(ExitCode/ResultKind/各 Envelope/OutputChannel/RunOutcome/emit/finalize)
 ├── search_topic.py              ← キーワード検索の最小ラッパー
 ├── search_extract_topic.py      ← search → extract の合成
 ├── research_topic.py            ← Research API ラッパー

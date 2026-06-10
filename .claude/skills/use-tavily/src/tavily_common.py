@@ -14,6 +14,11 @@ script, so the value a caller gets back is never script-specific guesswork:
    ``result_kind`` discriminator that tells the caller how to read ``result``.
 3. Full audit log -> ``ResponseEnvelope`` (a ``TypedDict``), always written to
    ``logs/<script>-log.json`` regardless of ``--output``.
+4. Output destination -> ``OutputChannel`` (an ``Enum``). Fixes *where* each of
+   the above goes: stdout carries the machine-readable result and nothing else,
+   every human/AI notice is a stderr ``DIAGNOSTIC``, and durable records are
+   files. ``emit()`` is the single sink that routes by this enum, so a caller
+   can parse stdout verbatim and read stderr as pure diagnostics.
 
 Architecture: **functional core / imperative shell.** Each ``main()`` is a
 compute step that returns a ``RunOutcome`` value (exit code + payloads + message)
@@ -67,13 +72,149 @@ class ResultKind(str, Enum):
 
     Tells the caller how to interpret ``result`` without reading the producing
     script's source. ``str`` mixin so the value serializes as a plain string.
+    The concrete element type each member names is defined below as a
+    ``TypedDict`` (e.g. ``SEARCH_RESULTS`` -> ``list[SearchResultItem]``).
     """
 
-    SEARCH_RESULTS = "search_results"      # list[dict]: Tavily search result objects.
-    EXTRACT_RESULTS = "extract_results"    # list[dict]: Tavily extract result objects.
-    CRAWL_RESULTS = "crawl_results"        # list[dict]: Tavily crawl result objects.
-    SITE_PAGES = "site_pages"              # list[dict]: page-title records (see map_site_titles.PageTitleResult).
-    RESEARCH_REPORT = "research_report"    # str | dict: research report content (markdown) or the raw final response.
+    SEARCH_RESULTS = "search_results"      # list[SearchResultItem]: Tavily search result objects.
+    EXTRACT_RESULTS = "extract_results"    # list[ExtractResultItem]: Tavily extract result objects.
+    CRAWL_RESULTS = "crawl_results"        # list[CrawlResultItem]: Tavily crawl result objects.
+    SITE_PAGES = "site_pages"              # list[SitePageItem]: page-title records (see PageTitleResult / SitePageItem).
+    RESEARCH_REPORT = "research_report"    # str (markdown report) on success, else the raw final response dict.
+
+
+# ---------------------------------------------------------------------------
+# Tavily per-item result types — EMPIRICALLY pinned, not copied from the docs.
+#
+# Each TypedDict names the concrete shape of one object inside the ``result``
+# list that ``ResultKind`` discriminates, as observed from the LIVE Tavily API
+# (tavily-python 0.7.x) when called with THIS skill's fixed wrapper flags
+# (``include_raw_content`` / ``include_images`` / ``include_favicon`` all False,
+# ``format="markdown"``). They are deliberately narrower than "some dict":
+# downstream code may rely on every key declared here. Real captured responses
+# live in ``tests/fixtures/`` and ``tests/test_result_types.py`` keeps these
+# definitions honest against them.
+#
+# Where the published reference disagreed with reality, reality wins (verified
+# against live responses on 2026-06-10):
+#   - search items ALWAYS carry a ``raw_content`` key — value ``None`` under our
+#     flags (the docs imply the key only appears with ``include_raw_content``).
+#   - extract items carry an UNDOCUMENTED ``title``; ``images`` is a (usually
+#     empty) list even with ``include_images=False``.
+#   - crawl items carry ONLY ``url`` + ``raw_content`` (nullable) under our flags
+#     — no ``title`` / ``images`` / ``favicon``.
+#   - a completed research response's ``sources[]`` are ``{url, title, favicon}``
+#     (the docs said ``{url, title, citation}``).
+# ---------------------------------------------------------------------------
+
+
+class SearchResultItem(TypedDict):
+    """One object in ``search_topic.py`` results (``ResultKind.SEARCH_RESULTS``)."""
+
+    title: str
+    url: str
+    content: str          # NLP summary or reranked chunks, depending on search_depth
+    score: float          # semantic relevance, 0-1
+    raw_content: str | None  # None under our flags; str only if include_raw_content is enabled
+
+
+class ExtractResultItem(TypedDict):
+    """One object in extract results (``ResultKind.EXTRACT_RESULTS``).
+
+    Shared by ``extract_url_content`` / ``search_extract_topic`` /
+    ``map_extract_site_content`` (they all emit Tavily extract objects).
+    """
+
+    url: str
+    title: str         # present in practice, though absent from the published Response Fields
+    raw_content: str   # full page content, or query-reranked chunks joined by " [...] "
+    images: list[str]  # empty list under our flags (include_images=False)
+
+
+class ExtractFailedItem(TypedDict):
+    """One object in an extract response's ``failed_results``.
+
+    Failures are surfaced as a non-success ``ExitCode`` and the details are
+    discarded downstream, so this is typed only lightly.
+    """
+
+    url: str
+    error: str
+
+
+class CrawlResultItem(TypedDict):
+    """One object in ``crawl_site_content.py`` results (``ResultKind.CRAWL_RESULTS``)."""
+
+    url: str
+    raw_content: str | None  # None when the crawled page yielded no extractable content
+
+
+class SitePageItem(TypedDict):
+    """One object in ``map_site_titles.py`` results (``ResultKind.SITE_PAGES``).
+
+    Built locally from ``PageTitleResult.as_dict()`` (NOT a raw Tavily object),
+    so this shape is fully under our control. The underlying ``map`` call's own
+    ``results`` is a ``list[str]`` of URLs, consumed internally to produce these
+    records. Mirror this with ``map_site_titles.PageTitleResult``.
+    """
+
+    url: str
+    title: str
+    short_title: str | None
+    title_source: str        # "html" | "url_fallback"
+    final_url: str | None
+    content_type: str | None
+    status_code: int | None
+    error: str | None
+
+
+class ResearchSource(TypedDict):
+    """One object in a completed research response's ``sources`` list."""
+
+    url: str
+    title: str
+    favicon: str
+
+
+class CompletedResearchResponse(TypedDict):
+    """Shape of a COMPLETED ``get_research`` response.
+
+    ``research_topic.py`` emits ``content`` (a ``str``) as its
+    ``RESEARCH_REPORT`` result on success, falling back to this whole dict on a
+    non-completed terminal status. ``status`` is ``"completed"`` here.
+    """
+
+    status: str
+    content: str
+    sources: list[ResearchSource]
+    created_at: str
+    response_time: float
+    request_id: str
+
+
+class OutputChannel(str, Enum):
+    """Authoritative set of destinations a run may write to (the 4th contract).
+
+    Alongside ``ExitCode`` (the outcome), ``ResultEnvelope`` (the data) and
+    ``ResponseEnvelope`` (the record), this enum fixes *where* each kind of
+    output goes, so a caller never has to guess which stream carries data and
+    which carries noise. Every byte this module emits passes through ``emit()``
+    tagged with one of these members, and that is the ONLY place output happens.
+
+    The discipline these members encode:
+
+    - stdout carries the machine-readable result and NOTHING else
+      (``RESULT_STDOUT``), so a caller can parse stdout verbatim.
+    - Every human/AI-facing notice is a ``DIAGNOSTIC`` on stderr; it is never
+      structured and never lands on stdout.
+    - Durable records are files: the public envelope (``RESULT_FILE``) and the
+      full audit log (``AUDIT_LOG``).
+    """
+
+    RESULT_STDOUT = "result_stdout"   # ResultEnvelope JSON -> stdout (only when --output is absent).
+    RESULT_FILE = "result_file"       # ResultEnvelope JSON -> the --output path.
+    AUDIT_LOG = "audit_log"           # ResponseEnvelope JSON -> logs/<script>-log.json (always).
+    DIAGNOSTIC = "diagnostic"         # one human/AI-facing line -> stderr (never stdout, never structured).
 
 
 class EnvironmentInfo(TypedDict):
@@ -153,7 +294,7 @@ def finalize(outcome: RunOutcome) -> ExitCode:
             exit_code=outcome.exit_code,
         )
     if outcome.message:
-        print(outcome.message, file=sys.stderr)
+        emit(OutputChannel.DIAGNOSTIC, outcome.message)
     return outcome.exit_code
 
 
@@ -240,6 +381,26 @@ def build_log_output_path(output_path: Path | None, *, script_name: str) -> Path
     return LOG_DIRECTORY / f"{base_path.stem}-log{suffix}"
 
 
+def emit(channel: OutputChannel, payload: Any, *, path: Path | None = None, pretty: bool = True) -> None:
+    """The single sink for every stdout / stderr / file write in this module.
+
+    Routing is keyed by ``channel`` (see ``OutputChannel``) so the output
+    contract lives in one place instead of being scattered across ``print``
+    calls. The file channels (``RESULT_FILE`` / ``AUDIT_LOG``) require ``path``;
+    the stream channels ignore it. Keeping this the ONLY place output happens is
+    what lets ``OutputChannel`` actually govern where bytes go.
+    """
+    if channel is OutputChannel.DIAGNOSTIC:
+        print(payload, file=sys.stderr)
+        return
+    if channel is OutputChannel.RESULT_STDOUT:
+        print(render_json(payload, pretty=pretty), end="")
+        return
+    if path is None:
+        raise ValueError(f"{channel.value} requires a destination path")
+    write_output(path, payload, pretty=pretty)
+
+
 def emit_payload(
     payload: ResponseEnvelope,
     output_path: Path | None,
@@ -249,13 +410,14 @@ def emit_payload(
     exit_code: ExitCode = ExitCode.SUCCESS,
     pretty: bool = True,
 ) -> None:
-    """Write the two return-contract artifacts of a run.
+    """Emit the two record artifacts of a run, routed through ``emit()``.
 
-    Always: the full ``ResponseEnvelope`` to ``logs/<script>-log.json``.
-    Public: a ``ResultEnvelope`` (``script`` / ``result_kind`` / ``exit_code`` /
-    ``result``) to ``output_path`` if given, otherwise to stdout. ``result_kind``
-    and ``exit_code`` make the emitted JSON self-describing, so the caller never
-    has to infer the shape or outcome from the producing script.
+    Always: the full ``ResponseEnvelope`` to ``logs/<script>-log.json``
+    (``AUDIT_LOG``). Public: a ``ResultEnvelope`` (``script`` / ``result_kind`` /
+    ``exit_code`` / ``result``) to ``output_path`` (``RESULT_FILE``) if given,
+    otherwise to stdout (``RESULT_STDOUT``). ``result_kind`` and ``exit_code``
+    make the emitted JSON self-describing. Every accompanying notice is a
+    ``DIAGNOSTIC`` on stderr, so stdout never carries anything but the result.
     """
     result_envelope = build_result_envelope(
         script_name=payload.get("script", "payload"),
@@ -264,16 +426,14 @@ def emit_payload(
         exit_code=exit_code,
     )
     log_path = build_log_output_path(output_path, script_name=payload.get("script", "payload"))
-    write_output(log_path, payload, pretty=pretty)
+    emit(OutputChannel.AUDIT_LOG, payload, path=log_path, pretty=pretty)
 
     if output_path:
-        write_output(output_path, result_envelope, pretty=pretty)
-        print(f"Wrote result envelope to {output_path}")
-        print(f"Wrote full log to {log_path}")
-        return
-
-    print(render_json(result_envelope, pretty=pretty), end="")
-    print(f"Wrote full log to {log_path}", file=sys.stderr)
+        emit(OutputChannel.RESULT_FILE, result_envelope, path=output_path, pretty=pretty)
+        emit(OutputChannel.DIAGNOSTIC, f"Wrote result envelope to {output_path}")
+    else:
+        emit(OutputChannel.RESULT_STDOUT, result_envelope, pretty=pretty)
+    emit(OutputChannel.DIAGNOSTIC, f"Wrote full log to {log_path}")
 
 
 def dedupe_preserve_order(values: Sequence[str]) -> list[str]:

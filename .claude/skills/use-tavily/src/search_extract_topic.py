@@ -7,10 +7,10 @@ this pipeline is resolved inside this file into concrete Tavily arguments
 before the helper functions are called.
 
 PowerShell example:
-    python .\.claude\skills\use-tavily\src\search_extract_topic.py "Azure API Management policy expressions limitations" --output temp\web\search_extract_apim_policy_limitations.json
+    python .\.claude\skills\use-tavily\src\search_extract_topic.py "Azure API Management policy expressions limitations" --topic extract_apim_policy_limitations
 
 bash example:
-    python ./.claude/skills/use-tavily/src/search_extract_topic.py "Azure API Management policy expressions limitations" --output temp/web/search_extract_apim_policy_limitations.json
+    python ./.claude/skills/use-tavily/src/search_extract_topic.py "Azure API Management policy expressions limitations" --topic extract_apim_policy_limitations
 """
 
 from __future__ import annotations
@@ -137,9 +137,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional domain to exclude. Repeat to exclude multiple domains.",
     )
     parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional path to write the JSON response.",
+        "--topic",
+        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
     )
     return parser.parse_args(argv)
 
@@ -223,7 +222,7 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
 
     return RunOutcome(
         exit_code=exit_code,
-        output_path=args.output,
+        topic=args.topic,
         log=payload,
         result_kind=ResultKind.EXTRACT_RESULTS,
         result=(extraction["response"].get("results") or []) if extraction else [],

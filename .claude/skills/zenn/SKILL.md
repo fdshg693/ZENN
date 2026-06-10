@@ -1,15 +1,24 @@
 ---
-# Version 1.0.0
+# Version 2.0.0
 name: zenn
 description: ZENN記事を、事前調査→概要提案→ユーザー承認→調査→plan→承認→publish の順で進めるスキル
 disable-model-invocation: false
 user-invocable: true
 
 # use-tavilyスキルを前提
-# - 同階層の.envファイルに有効なTAVILY_API_KEYの設定が必要
+# - 同階層(.claude/skills/use-tavily/.env)に有効なTAVILY_API_KEYの設定が必要
 # - Python が使える環境
 # - tavily / python-dotenv がグローバルにインストールされていること
-# - 短縮コマンド tav を使うには、初回のみ `pip install -e .claude/skills/use-tavily` を実行する 
+# - 短縮コマンド tav を使うには、初回のみ `pip install -e .claude/skills/use-tavily` を実行する
+#
+# use-tavily の Python スクリプトが読む .env 設定で、本スキルが前提とする値:
+# - TAVILY_OUTPUT_DIR は未設定(=既定 temp/web)または temp/web であること。
+#   本スキルは調査結果を temp/web/<topic>/ から読む前提で書かれているため、別ディレクトリに
+#   変更すると --topic で出した先と読みに行く先が食い違う(齟齬の原因)。変更する場合は
+#   本スキル内の temp\web\... 参照も合わせて読み替えること。
+# - TAVILY_OUTPUT_DIR の相対パスは「コマンド実行時のカレントディレクトリ」基準で解決される。
+#   よって tav / スクリプトは必ずリポジトリルートから実行する(そうすれば ./temp/web/<topic>/ に出る)。
+# - TAVILY_WRITE_LOG は任意(未設定=true で logs/<script>-log.json を残す。記事執筆では参照不要なので false にしてもよい)。
 
 # 関連スキルとして、zenn-refineスキルがある。
 # - このスキルの後続として使うことで、本番ZENN記事に近い質のアウトプットを目指すことができる
@@ -63,6 +72,8 @@ user-invocable: true
 
 まず `.claude\skills\use-tavily\SKILL.md` を読み、このスキルを使う前提で進めてください。外部情報の収集は短縮コマンド `tav <サブコマンド>` で呼ぶ(未インストール環境では従来どおり `python .\.claude\skills\use-tavily\src\<script>.py` でも可)。
 
+前提設定の確認(齟齬防止): `.claude\skills\use-tavily\.env` の `TAVILY_OUTPUT_DIR` が未設定または `temp/web` であることを確認する(本スキルは `temp/web/<topic>/` から結果を読む)。別値なら、本スキル内の `temp\web\...` 参照をその値に読み替えるか、`.env` を `temp/web` に揃える。コマンドは必ずリポジトリルートから実行する(相対パスはカレントディレクトリ基準で解決されるため)。
+
 利用する主なコマンド:
 
 - `tav search`: キーワードから関連 URL を探す
@@ -75,15 +86,13 @@ user-invocable: true
 
 必要に応じて各コマンドの `tav <サブコマンド> --help` も確認してください。
 
-出力ファイルは基本的に `temp\{unique_name_per_article}\` 以下へ保存してください。記事ごとにトピック名のスラッグを決め、以下のように整理します。
+出力先はフルパスではなく `--topic <name>` で指定してください。記事ごとにトピック名のスラッグ(`{unique_name_per_article}`)を決め、各コマンドに `--topic {unique_name_per_article}` を渡します。実際の保存先は `<TAVILY_OUTPUT_DIR>/<topic>/`(既定 `temp\web\{unique_name_per_article}\`)に解決され、その配下に以下のレイアウトで書き出されます。
 
-- `temp\{unique_name_per_article}\search_{topic_slug}.json`
-- `temp\{unique_name_per_article}\research_{topic_slug}.json`
-- `temp\{unique_name_per_article}\extract_{topic_slug}.json`
-- `temp\{unique_name_per_article}\site_map_{topic_slug}.json`
-- `temp\{unique_name_per_article}\site_extract_{topic_slug}.json`
+- 集約系(`search` / `map`): `search.json` / `map.json`(url+title の一覧を 1 ファイルに集約)
+- 単一系(`research`): `research.json`(レポート 1 ファイル)
+- 分割系(`extract` / `search-extract` / `map-extract` / `crawl`): URL ごとに `0001.json`, `0002.json`, … + マスター索引 `index.json`
 
-`topic_slug` は英数字と `_` を使った短い識別子に揃えてください。
+`{unique_name_per_article}` は英数字と `_` を使った短い識別子に揃えてください。分割系の結果を読むときは、**まず `index.json` を開いて各エントリの `file`(`0001.json` …)と `url`/`title` を把握し、必要な連番ファイルを辿って**ください。集約系・単一系はそのファイル 1 つを読みます。
 
 ## 0.a 記事ファイルの配置と frontmatter ルール
 
@@ -135,7 +144,7 @@ user-invocable: true
 例:
 
 ```powershell
-tav search "Azure API Management OpenAI integration" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --output temp\{unique_name_per_article}\search_apim_openai_overview.json
+tav search "Azure API Management OpenAI integration" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --topic {unique_name_per_article}
 ```
 
 より「問い」に近いテーマで、概要までまとめてほしい場合は `research_topic.py` を使っても構いません。
@@ -143,7 +152,7 @@ tav search "Azure API Management OpenAI integration" --detail balanced --include
 例:
 
 ```powershell
-tav research "Azure API Management で Azure OpenAI を公開する設計上のポイントを整理してください。公式 Docs と Github を優先し、記事概要の判断に必要な最新論点をまとめてください。" --detail balanced --output temp\{unique_name_per_article}\research_apim_openai_overview.json
+tav research "Azure API Management で Azure OpenAI を公開する設計上のポイントを整理してください。公式 Docs と Github を優先し、記事概要の判断に必要な最新論点をまとめてください。" --detail balanced --topic {unique_name_per_article}
 ```
 
 ### 1.b 軽い事前調査で止めてよいライン
@@ -225,7 +234,7 @@ tav research "Azure API Management で Azure OpenAI を公開する設計上の�
 一般的な WEB 検索ツールではなく、`tav search` または必要に応じて `tav research` を使ってください(`.claude\skills\use-tavily\SKILL.md` 参照)。
 
 まずは参考になる公式 Docs や GitHub を確定させてください。
-そのうえで、公式 Docs を中心に参照すべき URL とそれらのタイトルを整理し、`temp\{unique_name_per_article}\search_{keyword1_keyword2_...}.md` に保存してください。(スクリプトの出力をそのまま使うのでなく、スクリプトの結果を元に不要箇所の削除等を行い、読みやすい形に整形してください)
+そのうえで、公式 Docs を中心に参照すべき URL とそれらのタイトルを整理し、`temp\{unique_name_per_article}\search_{keyword1_keyword2_...}.md` に保存してください。(`tav` の出力をそのまま使うのでなく、トピックフォルダ `temp\web\{unique_name_per_article}\` 配下の結果を読み、不要箇所の削除等を行って読みやすい形に整形してください)
 
 可能なら include-domain を使って公式ドメインを優先してください。
 最終報告では以下を返してください。
@@ -239,18 +248,18 @@ tav research "Azure API Management で Azure OpenAI を公開する設計上の�
 推奨コマンド例:
 
 ```powershell
-tav search "Azure API Management policy expressions" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --output temp\{unique_name_per_article}\search_apim_policy_expressions.json
+tav search "Azure API Management policy expressions" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --topic {unique_name_per_article}
 ```
 
 広めに調査して論点整理も必要なら:
 
 ```powershell
-tav research "Azure API Management policy expressions の最新情報を整理してください。公式 Docs と Github を優先し、記事執筆で先に読むべき資料を洗い出してください。" --detail balanced --output temp\{unique_name_per_article}\research_apim_policy_expressions.json
+tav research "Azure API Management policy expressions の最新情報を整理してください。公式 Docs と Github を優先し、記事執筆で先に読むべき資料を洗い出してください。" --detail balanced --topic {unique_name_per_article}
 ```
 
 ### 2.c URL 候補から、読むべき資料を特定する
 
-`search_*.json` や `research_*.json` を読み、記事を書くために本文まで確認すべき URL を選定してください。
+トピックフォルダ配下の `search.json`(集約系)や `research.json`(単一系)を読み、記事を書くために本文まで確認すべき URL を選定してください。
 
 選定の基準:
 
@@ -266,7 +275,7 @@ URL がすでに決まっている場合は `extract_url_content.py` を使っ�
 例:
 
 ```powershell
-tav extract https://learn.microsoft.com/azure/api-management/api-management-policies https://learn.microsoft.com/azure/api-management/api-management-policy-expressions --query "APIM policy で何ができるか、制約、実務上重要な注意点" --detail balanced --output temp\{unique_name_per_article}\extract_apim_policies.json
+tav extract https://learn.microsoft.com/azure/api-management/api-management-policies https://learn.microsoft.com/azure/api-management/api-management-policy-expressions --query "APIM policy で何ができるか、制約、実務上重要な注意点" --detail balanced --topic {unique_name_per_article}
 ```
 
 キーワードから候補 URL の抽出まで含めて一気に行いたい場合は `search_extract_topic.py` を使ってください。
@@ -274,7 +283,7 @@ tav extract https://learn.microsoft.com/azure/api-management/api-management-poli
 例:
 
 ```powershell
-tav search-extract "Azure API Management policy expressions limitations" --detail balanced --include-domain learn.microsoft.com --output temp\{unique_name_per_article}\extract_apim_policy_limitations.json
+tav search-extract "Azure API Management policy expressions limitations" --detail balanced --include-domain learn.microsoft.com --topic {unique_name_per_article}
 ```
 
 公式 Docs サイト全体の構造を先に見たい場合は `map_site_titles.py` を使ってください。
@@ -282,7 +291,7 @@ tav search-extract "Azure API Management policy expressions limitations" --detai
 例:
 
 ```powershell
-tav map https://learn.microsoft.com/azure/api-management/ --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_map_apim_docs.json
+tav map https://learn.microsoft.com/azure/api-management/ --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --topic {unique_name_per_article}
 ```
 
 特定サイトから関連ページ本文をまとめて収集したい場合は `map_extract_site_content.py` を使ってください。
@@ -290,7 +299,7 @@ tav map https://learn.microsoft.com/azure/api-management/ --detail balanced --se
 例:
 
 ```powershell
-tav map-extract https://learn.microsoft.com/azure/api-management/ --query "self-hosted gateway architecture, limitations, pricing-related considerations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_extract_apim_gateway.json
+tav map-extract https://learn.microsoft.com/azure/api-management/ --query "self-hosted gateway architecture, limitations, pricing-related considerations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --topic {unique_name_per_article}
 ```
 
 サイト全体を直接クロールしたい場合は `crawl_site_content.py` を使ってください。対象サイトが限定されていて、関連情報を広く拾いたい場合に向いています。
@@ -298,7 +307,7 @@ tav map-extract https://learn.microsoft.com/azure/api-management/ --query "self-
 例:
 
 ```powershell
-tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace feature, v2 tiers, current limitations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_crawl_apim_workspace.json
+tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace feature, v2 tiers, current limitations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --topic {unique_name_per_article}
 ```
 
 ### 2.e 追加調査の原則
@@ -348,7 +357,7 @@ tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace f
 - セクション名: {section_title}
 - 記事全体のテーマ: {article_theme}
 - このセクションで答える問い: {section_goal}
-- 主に参照するファイル: {temp\{unique_name_per_article}\...json}
+- 主に参照するファイル: {temp\web\{unique_name_per_article}\...(分割系は index.json から各 NNNN.json、集約/単一系は search.json/map.json/research.json)}
 - 主に参照する URL: {url1, url2, ...}
 
 まずは指定された JSON 調査結果と URL を読み、根拠を確認してください。
@@ -365,16 +374,18 @@ tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace f
 
 ### 4.b 蓄積した調査 JSON から事実を抽出させる指示例
 
-本格調査で `temp\{unique_name_per_article}\*.json` が 5 本以上溜まった段階では、メインエージェントで全て読むと文脈を圧迫します。この「事実抽出のみ」を Explore / 汎用サブエージェントに切り出すと効きます(Web 検索はさせず、既存 JSON の読解だけさせるのがポイント)。
+本格調査でトピックフォルダ `temp\web\{unique_name_per_article}\` の JSON が増えた段階では、メインエージェントで全て読むと文脈を圧迫します。この「事実抽出のみ」を Explore / 汎用サブエージェントに切り出すと効きます(Web 検索はさせず、既存 JSON の読解だけさせるのがポイント)。
 
 ```markdown
 以下の JSON 調査結果を読み、記事の各セクションに使う**具体的で検証可能な事実**を抽出してください。
 新しい検索は行わないでください。既に保存された JSON を読むだけです。
 
-- 対象ファイル: `temp\{unique_name_per_article}\{topic_slug}_*.json`(複数)
+- 対象フォルダ: `temp\web\{unique_name_per_article}\`
+  - 分割系(extract / crawl / search-extract / map-extract)は、まず `index.json` を開いて各エントリの `file`(`0001.json` …)と `url`/`title` を把握し、各 `NNNN.json` を辿って本文を読む
+  - 集約系・単一系は `search.json` / `map.json` / `research.json` をそのまま読む
 - 記事全体のテーマ: {article_theme}
 
-各結果オブジェクトは `url` と `content` / `raw_content` を持ちます。
+各結果オブジェクトは `url` と `content` / `raw_content` を持ちます(分割系の `NNNN.json` は `result` がその URL 単体のアイテムで、`title` も持ちます)。
 
 以下のセクションごとに、6〜15 個の事実を、各事実に**根拠 URL を inline で** 併記してください。
 具体的な数値(上限、SLA、レイテンシ、RU、料金)が本文に書かれている場合は必ず引用してください。

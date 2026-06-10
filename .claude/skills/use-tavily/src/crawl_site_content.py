@@ -7,10 +7,10 @@ top of this file when you want to change crawl breadth, depth, or extraction
 quality.
 
 PowerShell example:
-    python .\.claude\skills\use-tavily\src\crawl_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature limitations" --output temp\web\site_crawl_apim_workspace.json
+    python .\.claude\skills\use-tavily\src\crawl_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature limitations" --topic apim_workspace
 
 bash example:
-    python ./.claude/skills/use-tavily/src/crawl_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature limitations" --output temp/web/site_crawl_apim_workspace.json
+    python ./.claude/skills/use-tavily/src/crawl_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature limitations" --topic apim_workspace
 """
 
 from __future__ import annotations
@@ -120,9 +120,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Include external-domain URLs discovered during crawl.",
     )
     parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional path to write the JSON response.",
+        "--topic",
+        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
     )
     return parser.parse_args(argv)
 
@@ -272,7 +271,7 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
 
     return RunOutcome(
         exit_code=ExitCode.SUCCESS,
-        output_path=args.output,
+        topic=args.topic,
         log=payload,
         result_kind=ResultKind.CRAWL_RESULTS,
         result=crawl_run["response"].get("results") or [],

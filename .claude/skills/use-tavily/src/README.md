@@ -29,7 +29,7 @@
 ```bash
 tav search "Microsoft Fabric overview" \
   --include-domain learn.microsoft.com \
-  --output temp/web/search_msfabric_overview.json
+  --topic msfabric_overview
 ```
 
 PowerShell の場合:
@@ -37,8 +37,12 @@ PowerShell の場合:
 ```powershell
 tav search "Microsoft Fabric overview" `
   --include-domain learn.microsoft.com `
-  --output temp\web\search_msfabric_overview.json
+  --topic msfabric_overview
 ```
+
+`--topic <name>` を渡すと `<TAVILY_OUTPUT_DIR>/<topic>/`(`.env` の `TAVILY_OUTPUT_DIR`、未設定時は `temp/web`)配下に書き出します。`--topic` を省くと単一 `ResultEnvelope` を stdout に出します(パイプ用途)。
+
+`TAVILY_OUTPUT_DIR` の解決基準: 絶対パスはそのまま、相対パス(既定 `temp/web` を含む)は **実行時のカレントディレクトリ基準**で解決します(`.env` やスクリプトの場所ではない)。正本は `tavily_common.get_output_dir()` の docstring。`./temp/web/<topic>/` に出すにはリポジトリルートから実行してください。
 
 各サブコマンドの引数詳細は `--help` で確認できます(サブコマンド一覧は引数なしの `tav`)。
 
@@ -54,7 +58,7 @@ CLI の戻り値は **終了コード・出力データ・監査ログ・出力�
 
 ### 内部構造 — functional core / imperative shell
 
-各スクリプトの `main()` は **副作用を持たない計算ステップ** で、戻り値として `RunOutcome`(`dataclass`: 終了コード + 出力先 + ログ + `result_kind` + `result` + stderr メッセージ)を返すだけ。ファイル書き込みや stdout/stderr 出力は一切しない。
+各スクリプトの `main()` は **副作用を持たない計算ステップ** で、戻り値として `RunOutcome`(`dataclass`: 終了コード + `topic` + ログ + `result_kind` + `result` + stderr メッセージ)を返すだけ。ファイル書き込みや stdout/stderr 出力は一切しない。`output_path` は廃止し、代わりに `topic`(`str | None`)を持つ。`finalize` が `topic` の有無で出力レイアウト(トピックフォルダ配下のファイル群か stdout 単一)を決める。
 
 I/O は唯一 `finalize(outcome) -> ExitCode` が担う。エントリポイントは常に次の 1 行:
 
@@ -80,9 +84,9 @@ if __name__ == "__main__":
 
 `4` / `5` は以前 1 つのコードに混在していたものを分離しています(`research` のタイムアウトは `4` ではなく `5`)。
 
-### 2. 出力データ — `ResultEnvelope`(`--output` ファイル / stdout)
+### 2. 出力データ — `ResultEnvelope`(トピックフォルダ配下のファイル / stdout)
 
-全スクリプトが **同一形状の自己記述エンベロープ** を出力します。`--output` 指定時はそのファイルへ、未指定時は stdout へ書き出します。`result_kind` が判別子で、`result` の中身の読み方を示します(スクリプトのソースを読まずに形が分かる)。
+全スクリプトが **同一形状の自己記述エンベロープ** を出力します。`result_kind` が判別子で、`result` の中身の読み方を示します(スクリプトのソースを読まずに形が分かる)。
 
 ```json
 {
@@ -92,6 +96,32 @@ if __name__ == "__main__":
   "result": [ /* result_kind で形が決まる */ ]
 }
 ```
+
+出力先は `--topic` の有無で 2 通りです。
+
+- **`--topic <name>` 未指定** → 単一 `ResultEnvelope` を stdout に書き出す(パイプ用途。従来どおり)。
+- **`--topic <name>` 指定** → `<TAVILY_OUTPUT_DIR>/<topic>/` 配下に、`result_kind` で決まる 3 系統のレイアウトで書き出す。
+
+| 系統 | 対象コマンド | レイアウト |
+|------|------------|-----------|
+| 集約(aggregate) | `search` → `search.json` / `map` → `map.json` | url+title の一覧をコマンド名のファイル 1 つに集約。中身は通常の `ResultEnvelope`(`result` はリスト)。 |
+| 分割(split) | `extract` / `crawl` / `search_extract` / `map_extract` | URL ごとに `0001.json`, `0002.json`, …(0001 から 4 桁ゼロ埋め)を 1 ファイルずつ + マスター索引 `index.json`。各連番ファイルは `result` がその URL 単体の content アイテム(リストではない)で、必ず `title` を持つ。 |
+| 単一(single) | `research` → `research.json` | research レポートは分割しない。`ResultEnvelope` 1 ファイル。 |
+
+分割系の `index.json` が唯一の url↔ファイル対応表です。形:
+
+```json
+{
+  "script": "crawl_site_content.py",
+  "result_kind": "crawl_results",
+  "topic": "msfabric_overview",
+  "entries": [
+    {"file": "0001.json", "url": "https://…", "title": "…", "title_source": "html|existing|url_fallback", "exit_code": 0}
+  ]
+}
+```
+
+後段で読むときは、分割系なら **`index.json` を起点に各 `NNNN.json` を辿る**(各連番ファイルの `result` は単一アイテム)。集約系・単一系はそのファイル 1 つを読む。`title` は content 系で必ず埋まる(既存タイトル保持 = `existing`、HTML 直 Fetch で補完 = `html`、URL 由来フォールバック = `url_fallback`。Tavily はタイトル取得に使わない)。同じコマンドを同じ `--topic` で再実行するとファイルと `index.json` は上書き(直近を正とする)。
 
 `result_kind`(`ResultKind`)と各スクリプトの `result` の中身:
 
@@ -112,9 +142,9 @@ if __name__ == "__main__":
 - 型を **どう実測して確定したか**(プローブ各種・fixtures 再生成)→ [../experiments/README.md](../experiments/README.md)
 - 型が **実 API と一致することの検証**(オフライン構造検証 + `TAVILY_LIVE_TESTS=1` のライブ再検証)→ [../tests/README.md](../tests/README.md)
 
-### 3. 監査ログ — `ResponseEnvelope`(常時)
+### 3. 監査ログ — `ResponseEnvelope`(`TAVILY_WRITE_LOG` で制御)
 
-`--output` の有無にかかわらず、毎回 `logs/<script>-log.json` にリクエスト/レスポンス全体を `{script, request, environment, response}` の形で残します。再現・原因追跡用の詳細ビューで、出力エンベロープよりも冗長です。
+`--topic` の有無にかかわらず、毎回 `logs/<script>-log.json` にリクエスト/レスポンス全体を `{script, request, environment, response}` の形で残します。再現・原因追跡用の詳細ビューで、出力エンベロープよりも冗長です。`.env` の `TAVILY_WRITE_LOG`(未設定=`true`、`false`/`0`/`no`/`off`/空で抑止)でこの監査ログ出力をトグルできます。
 
 ### 4. 出力先 — `OutputChannel`(どのストリーム/ファイルに何が出るか)
 
@@ -122,10 +152,12 @@ if __name__ == "__main__":
 
 | メンバー | 中身 | 行先 | 構造化 |
 |---------|------|------|--------|
-| `RESULT_STDOUT` | `ResultEnvelope` JSON | stdout(`--output` 未指定時のみ) | あり |
-| `RESULT_FILE` | `ResultEnvelope` JSON | `--output` のパス | あり |
-| `AUDIT_LOG` | `ResponseEnvelope` JSON | `logs/<script>-log.json`(常時) | あり |
+| `RESULT_STDOUT` | `ResultEnvelope` JSON | stdout(`--topic` 未指定時のみ) | あり |
+| `RESULT_FILE` | `ResultEnvelope` JSON / `index.json` | トピックフォルダ配下のファイル(集約 `search.json`/`map.json`、分割 `NNNN.json` + `index.json`、単一 `research.json`)。`--topic` 指定時のみ | あり |
+| `AUDIT_LOG` | `ResponseEnvelope` JSON | `logs/<script>-log.json`(`TAVILY_WRITE_LOG` が有効なときのみ) | あり |
 | `DIAGNOSTIC` | 「Wrote ...」「Research finished ...」等の 1 行 | stderr | なし |
+
+`--topic` 指定時の分割系では、`RESULT_FILE` が per-URL の `NNNN.json` とマスター索引 `index.json` の両方に使われます(チャンネルは増やさず `emit` の呼び出し回数を増やすだけ)。
 
 規律: **stdout には機械可読な `ResultEnvelope` だけ(または何も出さない)。「Wrote ...」等の通知・エラー・進捗はすべて stderr の `DIAGNOSTIC`。** 後段で結果をパースするときは stdout をそのまま読めばよく、stderr は純粋な診断として扱える。`emit()` 以外の場所で `print` しない(出力点を一箇所に集約する)ことがこの契約を成立させています。
 
@@ -148,7 +180,8 @@ if __name__ == "__main__":
 ```text
 src/
 ├── README.md                    ← このファイル(Python コードの説明)
-├── tavily_common.py             ← .env 読込、クライアント生成、JSON 整形、戻り値契約(ExitCode/ResultKind/各 Envelope/OutputChannel/RunOutcome/emit/finalize)
+├── tavily_common.py             ← .env 読込、クライアント生成、JSON 整形、戻り値契約(ExitCode/ResultKind/各 Envelope/OutputChannel/RunOutcome/emit/finalize)、出力レイアウト分岐・title 補完
+├── title_fetch.py               ← HTML を直接 Fetch してページタイトルを取得(map_site_titles と、tavily_common の分割系 title 補完が共有)
 ├── search_topic.py              ← キーワード検索の最小ラッパー
 ├── search_extract_topic.py      ← search → extract の合成
 ├── research_topic.py            ← Research API ラッパー
@@ -168,7 +201,9 @@ src/
 | `include_answer` / `include_raw_content` などの固定フラグ | 各スクリプト冒頭の定数(`INCLUDE_ANSWER` 等) |
 | タイムアウト | 各スクリプトの `REQUEST_TIMEOUT_SECONDS` |
 | `.env` 読み込み挙動・JSON 出力フォーマット | `tavily_common.py` |
-| 出力ファイル命名規約 | [SKILL.md](../SKILL.md) の「出力ファイルの推奨命名規約」セクション |
+| 出力先ベースディレクトリ(`--topic` の解決先、未設定時 `temp/web`) | `.env` の `TAVILY_OUTPUT_DIR` |
+| 監査ログ `logs/<script>-log.json` を書くか(未設定=`true`、`false`/`0`/`no`/`off`/空で抑止) | `.env` の `TAVILY_WRITE_LOG` |
+| 出力先と `--topic` レイアウト | [SKILL.md](../SKILL.md) の「出力先と `--topic` レイアウト」セクション |
 | AI に提示する判断フロー / 引数例 | [SKILL.md](../SKILL.md) 本体 |
 
 新しい使い方を追加したい場合は、`src/` 配下に同じスタイルで新スクリプトを作り、`SKILL.md` に判断フローと引数例を追記してください。`--detail` プリセットやデフォルト値は新スクリプト冒頭にも同じ形で置きます。

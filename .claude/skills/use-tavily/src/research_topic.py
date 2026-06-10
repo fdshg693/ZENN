@@ -6,10 +6,10 @@ an optional JSON output path. Adjust the preset values below when you want
 different Tavily research behavior.
 
 PowerShell example:
-    python .\.claude\skills\use-tavily\src\research_topic.py "Microsoft Fabric の概要を整理してください" --output temp\web\research_fabric_overview.json
+    python .\.claude\skills\use-tavily\src\research_topic.py "Microsoft Fabric の概要を整理してください" --topic fabric_overview
 
 bash example:
-    python ./.claude/skills/use-tavily/src/research_topic.py "Microsoft Fabric の概要を整理してください" --output temp/web/research_fabric_overview.json
+    python ./.claude/skills/use-tavily/src/research_topic.py "Microsoft Fabric の概要を整理してください" --topic fabric_overview
 """
 
 from __future__ import annotations
@@ -71,9 +71,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="High-level research preset. Model and polling behavior are predefined.",
     )
     parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional path to write the JSON response.",
+        "--topic",
+        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
     )
     return parser.parse_args(argv)
 
@@ -179,7 +178,7 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
 
     return RunOutcome(
         exit_code=exit_code,
-        output_path=args.output,
+        topic=args.topic,
         log=payload,
         result_kind=ResultKind.RESEARCH_REPORT,
         result=final_response.get("content") or final_response,

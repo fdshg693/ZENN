@@ -7,7 +7,7 @@ Tavily で集めた根拠を元に、Zenn 記事を **「概要提案 → 構成
 - `use-tavily` スキルが存在し、Tavily API キーがセットされていること
   - 詳細は [.claude/skills/use-tavily/README.md](../use-tavily/README.md) を参照
 - リポジトリ直下に `zenn/` ディレクトリ、その配下に `plan/` と `publish/` を作成可能なこと(初回実行時に作られる想定)
-- 調査結果の置き場として `temp/web/` ディレクトリが利用可能なこと
+- 調査結果の置き場として `<TAVILY_OUTPUT_DIR>/<topic>/`(既定 `temp/web/<topic>/`)が利用可能なこと。`--topic <name>` 指定でトピック単位のフォルダに出力される
 
 ## このスキルの目的
 
@@ -49,7 +49,7 @@ Claude Code 上で次のように呼び出します。
 └── SKILL.md    ← AI に読ませるスキル本体(3 段階フローの手順 / frontmatter ルール / サブエージェント指示例)
 
 リポジトリ直下:
-├── temp/web/                  ← use-tavily が出す調査 JSON
+├── temp/web/<topic>/          ← use-tavily が出す調査 JSON(--topic 単位。集約 search.json/map.json、分割 0001.json…+index.json、単一 research.json)
 └── zenn/
     ├── plan/{topic_slug}.md     ← 構成案(レビュー用、簡易 frontmatter + status: plan)
     └── publish/{topic_slug}.md  ← 本文(Zenn frontmatter 完備、デフォルト published: false)

@@ -6,10 +6,10 @@ filters. Adjust the preset values below when you want different Tavily search
 behavior. Other scripts in this directory can import the reusable search helper.
 
 PowerShell example:
-    python .\.claude\skills\use-tavily\src\search_topic.py "Microsoft Fabric overview" --output temp\web\search_fabric_overview.json
+    python .\.claude\skills\use-tavily\src\search_topic.py "Microsoft Fabric overview" --topic fabric_overview
 
 bash example:
-    python ./.claude/skills/use-tavily/src/search_topic.py "Microsoft Fabric overview" --output temp/web/search_fabric_overview.json
+    python ./.claude/skills/use-tavily/src/search_topic.py "Microsoft Fabric overview" --topic fabric_overview
 """
 
 from __future__ import annotations
@@ -87,9 +87,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Optional domain to exclude. Repeat to exclude multiple domains.",
     )
     parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional path to write the JSON response.",
+        "--topic",
+        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
     )
     return parser.parse_args(argv)
 
@@ -178,7 +177,7 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
 
     return RunOutcome(
         exit_code=ExitCode.SUCCESS,
-        output_path=args.output,
+        topic=args.topic,
         log=payload,
         result_kind=ResultKind.SEARCH_RESULTS,
         result=search_run["response"].get("results") or [],

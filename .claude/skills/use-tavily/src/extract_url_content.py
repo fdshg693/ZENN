@@ -6,10 +6,10 @@ Adjust the preset values below when you want different Tavily behavior.
 Other scripts in this directory can also import the reusable extraction helper.
 
 PowerShell example:
-    python .\.claude\skills\use-tavily\src\extract_url_content.py https://learn.microsoft.com/azure/api-management/api-management-policies --query "policy capabilities" --output temp\web\extract_apim_policies.json
+    python .\.claude\skills\use-tavily\src\extract_url_content.py https://learn.microsoft.com/azure/api-management/api-management-policies --query "policy capabilities" --topic apim_policies
 
 bash example:
-    python ./.claude/skills/use-tavily/src/extract_url_content.py https://learn.microsoft.com/azure/api-management/api-management-policies --query "policy capabilities" --output temp/web/extract_apim_policies.json
+    python ./.claude/skills/use-tavily/src/extract_url_content.py https://learn.microsoft.com/azure/api-management/api-management-policies --query "policy capabilities" --topic apim_policies
 """
 
 from __future__ import annotations
@@ -75,9 +75,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="High-level extraction preset. Tavily-specific values are already defined.",
     )
     parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional path to write the JSON response.",
+        "--topic",
+        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
     )
     return parser.parse_args(argv)
 
@@ -157,7 +156,7 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
 
     return RunOutcome(
         exit_code=ExitCode.SUCCESS,
-        output_path=args.output,
+        topic=args.topic,
         log=payload,
         result_kind=ResultKind.EXTRACT_RESULTS,
         result=extraction["response"].get("results") or [],

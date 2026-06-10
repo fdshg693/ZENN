@@ -8,13 +8,16 @@ Tavily の検索 / 抽出 / クロール / マップ / リサーチを、**プ�
 
 - Python / pip
 - Tavily API キー: `TAVILY_API_KEY` 環境変数にセットまたは、 `.claude\skills\use-tavily\.env` に記載
+- (任意)`.env` で出力先と監査ログを調整:
+  - `TAVILY_OUTPUT_DIR`: `--topic` の解決先ベースディレクトリ。未設定時は `temp/web`
+  - `TAVILY_WRITE_LOG`: `logs/<script>-log.json` を書くか。未設定=`true`、`false`/`0`/`no`/`off`/空で抑止
 - Tavily Python SDK / 依存パッケージ: `pip install tavily python-dotenv` でインストール
 
 ## このスキルの目的
 
 - AI が WEB 調査をするとき、毎回パラメータがブレて品質と費用が読めなくなる問題を解決する
 - Tavily SDK の細かいオプションを **スクリプト側のプリセットでロック** し、AI には「目的」と「詳細度」だけ選ばせる
-- 検索結果を `temp/web/` 配下に **命名規約付き JSON** で蓄積し、後段のスクリプトやサブエージェントが拾えるようにする
+- 検索結果を `<TAVILY_OUTPUT_DIR>/<topic>/` 配下(既定 `temp/web/<topic>/`)に **トピック単位のレイアウトで** 蓄積し、後段のスクリプトやサブエージェントが拾えるようにする
 - 実行のリクエスト/レスポンスを `src/logs/` に残し、後から再現・原因追跡できるようにする
 
 ## このスキルの特徴
@@ -22,7 +25,7 @@ Tavily の検索 / 抽出 / クロール / マップ / リサーチを、**プ�
 - **判断軸つき一枚スキル**: API ごとにスキルを分けず、`SKILL.md` の冒頭に「URL が分かっているか / サイトが分かっているか / キーワードだけか」という判断フローを置いている
 - **詳細度プリセット**: 各スクリプトの先頭に `DETAIL_PRESETS = {"quick": ..., "balanced": ..., "max": ...}` を持ち、Tavily の `search_depth` / `max_results` / `chunks_per_source` などはここで集中管理
 - **共通モジュール化**: `.env` 読み込み・Tavily クライアント生成・JSON ペイロード整形を `src/tavily_common.py` に集約
-- **出力命名規約**: `temp/web/{prefix}_{topic_slug}.json` 形式で出力先を統一(`search_` / `extract_` / `site_map_` / `site_extract_` / `site_crawl_` / `search_extract_` / `research_`)
+- **`--topic` トピックレイアウト**: 出力先はフルパスでなく `--topic <name>` で指定し、`<TAVILY_OUTPUT_DIR>/<topic>/`(既定 `temp/web/<topic>/`)配下に集約(`search.json`/`map.json`)・分割(`0001.json`… + `index.json`)・単一(`research.json`)の 3 系統で書き出す(`--topic` 省略時は stdout に単一 `ResultEnvelope`)
 - **戻り値の契約**: 全スクリプトが同一形状の自己記述エンベロープ(`result_kind` + `result` + `exit_code`)を出力し、終了コードは `ExitCode`(`IntEnum`)で共通化。`src/tavily_common.py` の列挙/`TypedDict` が正本で、詳細は [src/README.md](src/README.md) の「実行結果の戻り値(契約)」を参照
 - **bash / PowerShell 両対応の実行例**: 各スクリプトの docstring 冒頭に最小コマンド例を載せている
 
@@ -33,7 +36,7 @@ Tavily の検索 / 抽出 / クロール / マップ / リサーチを、**プ�
 | ファイル | 読む人 | 内容 |
 |----------|--------|------|
 | `README.md`(このファイル) | スキルを導入・把握したい人 | スキルの目的、前提条件、全体像、ドキュメント構成 |
-| [SKILL.md](SKILL.md) | AI(スキル本体) | 判断フロー、`--detail` プリセット早見表、並列/コストの目安、出力命名規約 |
+| [SKILL.md](SKILL.md) | AI(スキル本体) | 判断フロー、`--detail` プリセット早見表、並列/コストの目安、`--topic` 出力レイアウト |
 | [src/README.md](src/README.md) | スクリプトを使う / 改修する人 | クイックスタート、スクリプト一覧、引数、カスタマイズ箇所 |
 
 ## ファイル構成
@@ -44,7 +47,8 @@ Tavily の検索 / 抽出 / クロール / マップ / リサーチを、**プ�
 ├── SKILL.md             ← AI に読ませるスキル本体(判断フロー / 引数例 / 命名規約)
 └── src/
     ├── README.md              ← Python コードの説明(使い方 / カスタマイズ)
-    ├── tavily_common.py       ← .env 読込、Tavily クライアント生成、JSON 整形
+    ├── tavily_common.py       ← .env 読込、Tavily クライアント生成、JSON 整形、出力レイアウト分岐・title 補完
+    ├── title_fetch.py         ← HTML 直 Fetch でページタイトル取得(map_site_titles と分割系 title 補完が共有)
     ├── search_topic.py        ← キーワード検索の最小ラッパー
     ├── search_extract_topic.py ← search → extract の合成
     ├── research_topic.py      ← Research API ラッパー

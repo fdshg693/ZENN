@@ -6,10 +6,10 @@ a root URL, an optional query, and a detail preset; edit the preset table near
 the top of this file when you want to change map breadth or extraction quality.
 
 PowerShell example:
-    python .\.claude\skills\use-tavily\src\map_extract_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature limitations" --output temp\web\site_extract_apim_workspace.json
+    python .\.claude\skills\use-tavily\src\map_extract_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature limitations" --topic extract_apim_workspace
 
 bash example:
-    python ./.claude/skills/use-tavily/src/map_extract_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature limitations" --output temp/web/site_extract_apim_workspace.json
+    python ./.claude/skills/use-tavily/src/map_extract_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature limitations" --topic extract_apim_workspace
 """
 
 from __future__ import annotations
@@ -148,9 +148,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="Include external-domain URLs in the mapped result set.",
     )
     parser.add_argument(
-        "--output",
-        type=Path,
-        help="Optional path to write the JSON response.",
+        "--topic",
+        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
     )
     return parser.parse_args(argv)
 
@@ -241,7 +240,7 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
 
     return RunOutcome(
         exit_code=exit_code,
-        output_path=args.output,
+        topic=args.topic,
         log=payload,
         result_kind=ResultKind.EXTRACT_RESULTS,
         result=(extraction["response"].get("results") or []) if extraction else [],

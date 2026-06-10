@@ -4,9 +4,9 @@ Installed as the ``tav`` console command (see ``../pyproject.toml``), so the lon
 ``python .\.claude\skills\use-tavily\src\<script>.py ...`` invocations collapse to
 short subcommands:
 
-    tav search "Microsoft Fabric overview" --detail balanced --output temp\web\search_fabric.json
-    tav extract https://learn.microsoft.com/azure/api-management/ --query "..." --output temp\web\extract.json
-    tav crawl  https://learn.microsoft.com/azure/api-management/ --query "..." --output temp\web\crawl.json
+    tav search "Microsoft Fabric overview" --detail balanced --topic fabric_overview
+    tav extract https://learn.microsoft.com/azure/api-management/ --query "..." --topic apim
+    tav crawl  https://learn.microsoft.com/azure/api-management/ --query "..." --topic apim
 
 This is a thin router only: it maps a subcommand name to one wrapper module and
 forwards the remaining arguments to that module's ``main(argv)``, then hands the

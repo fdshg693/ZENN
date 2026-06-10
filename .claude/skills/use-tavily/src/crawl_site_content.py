@@ -16,7 +16,6 @@ bash example:
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -24,7 +23,15 @@ from urllib.parse import urlparse
 
 from tavily.errors import InvalidAPIKeyError
 
-from tavily_common import build_response_payload, create_tavily_client, dedupe_preserve_order, emit_payload
+from tavily_common import (
+    ExitCode,
+    ResultKind,
+    RunOutcome,
+    build_response_payload,
+    create_tavily_client,
+    dedupe_preserve_order,
+    finalize,
+)
 
 
 DETAIL_PRESETS: dict[str, dict[str, Any]] = {
@@ -208,15 +215,20 @@ def summarize_crawl_response(response: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None) -> RunOutcome:
+    """Crawl a site and return a ``RunOutcome`` (no I/O; ``finalize()`` emits it).
+
+    ``SUCCESS`` on a completed call, or ``MISSING_API_KEY`` / ``INVALID_API_KEY`` /
+    ``RUNTIME_ERROR`` on the corresponding failure. The success outcome carries a
+    ``CRAWL_RESULTS`` result.
+    """
     args = parse_args(argv)
     crawl_options = resolve_crawl_options(args.detail, has_query=bool(args.query))
 
     try:
         client, dotenv_path = create_tavily_client()
     except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+        return RunOutcome(exit_code=ExitCode.MISSING_API_KEY, message=str(exc))
 
     try:
         crawl_run = run_crawl_request(
@@ -232,11 +244,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             allow_external=args.allow_external,
         )
     except InvalidAPIKeyError as exc:
-        print(f"Invalid Tavily API key: {exc}", file=sys.stderr)
-        return 3
+        return RunOutcome(exit_code=ExitCode.INVALID_API_KEY, message=f"Invalid Tavily API key: {exc}")
     except Exception as exc:
-        print(f"Site crawl failed: {exc}", file=sys.stderr)
-        return 1
+        return RunOutcome(exit_code=ExitCode.RUNTIME_ERROR, message=f"Site crawl failed: {exc}")
 
     payload = build_response_payload(
         script_name=Path(__file__).name,
@@ -260,9 +270,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         dotenv_path=dotenv_path,
     )
 
-    emit_payload(payload, args.output, public_payload=crawl_run["response"].get("results") or [])
-    return 0
+    return RunOutcome(
+        exit_code=ExitCode.SUCCESS,
+        output_path=args.output,
+        log=payload,
+        result_kind=ResultKind.CRAWL_RESULTS,
+        result=crawl_run["response"].get("results") or [],
+    )
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(finalize(main()))

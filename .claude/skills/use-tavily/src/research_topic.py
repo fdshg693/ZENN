@@ -15,14 +15,20 @@ bash example:
 from __future__ import annotations
 
 import argparse
-import sys
 import time
 from pathlib import Path
 from typing import Any
 
 from tavily.errors import InvalidAPIKeyError
 
-from tavily_common import build_response_payload, create_tavily_client, emit_payload
+from tavily_common import (
+    ExitCode,
+    ResultKind,
+    RunOutcome,
+    build_response_payload,
+    create_tavily_client,
+    finalize,
+)
 
 
 DETAIL_PRESETS: dict[str, dict[str, Any]] = {
@@ -85,15 +91,46 @@ def wait_for_research_completion(client: Any, request_id: str, *, detail: str) -
     elapsed_seconds = preset["max_wait_seconds"] - max(deadline - time.monotonic(), 0.0)
     return last_response, True, elapsed_seconds
 
-def main() -> int:
+def resolve_exit_code(*, completed: bool, final_status: str | None) -> ExitCode:
+    """Map a finished research run to its exit code (see ``ExitCode``).
+
+    ``INCOMPLETE`` (did not reach a terminal state within the wait window) is
+    deliberately distinct from ``RUNTIME_ERROR`` (reached a terminal but
+    non-``completed`` status, i.e. failed/cancelled).
+    """
+    if not completed:
+        return ExitCode.INCOMPLETE
+    if final_status != "completed":
+        return ExitCode.RUNTIME_ERROR
+    return ExitCode.SUCCESS
+
+
+def describe_outcome(exit_code: ExitCode, final_status: str | None) -> str | None:
+    """The stderr line for a finished research run, or ``None`` to stay silent."""
+    if exit_code is ExitCode.INCOMPLETE:
+        return "Research did not finish within the preset wait window. Re-run later or increase the preset."
+    if exit_code is ExitCode.RUNTIME_ERROR:
+        return f"Research finished with status: {final_status}"
+    return None
+
+
+def main() -> RunOutcome:
+    """Run research, wait for completion, and return a ``RunOutcome`` (no I/O;
+    ``finalize()`` emits it).
+
+    The success ``result`` is the report content (markdown) when available, else
+    the raw final response, carried as ``RESEARCH_REPORT``. Returns ``SUCCESS`` when
+    the run completed; ``INCOMPLETE`` if it did not finish within the preset wait
+    window; ``RUNTIME_ERROR`` on failure or a failed/cancelled terminal status;
+    ``MISSING_API_KEY`` / ``INVALID_API_KEY`` on credential problems.
+    """
     args = parse_args()
     preset = DETAIL_PRESETS[args.detail]
 
     try:
         client, dotenv_path = create_tavily_client()
     except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+        return RunOutcome(exit_code=ExitCode.MISSING_API_KEY, message=str(exc))
 
     try:
         initial_response = client.research(
@@ -112,11 +149,12 @@ def main() -> int:
             detail=args.detail,
         )
     except InvalidAPIKeyError as exc:
-        print(f"Invalid Tavily API key: {exc}", file=sys.stderr)
-        return 3
+        return RunOutcome(exit_code=ExitCode.INVALID_API_KEY, message=f"Invalid Tavily API key: {exc}")
     except Exception as exc:
-        print(f"Research failed: {exc}", file=sys.stderr)
-        return 1
+        return RunOutcome(exit_code=ExitCode.RUNTIME_ERROR, message=f"Research failed: {exc}")
+
+    final_status = final_response.get("status")
+    exit_code = resolve_exit_code(completed=completed, final_status=final_status)
 
     payload = build_response_payload(
         script_name=Path(__file__).name,
@@ -138,21 +176,15 @@ def main() -> int:
         dotenv_path=dotenv_path,
     )
 
-    emit_payload(payload, args.output, public_payload=final_response.get("content") or final_response)
-
-    final_status = final_response.get("status")
-    if not completed:
-        print(
-            "Research did not finish within the preset wait window. Re-run later or increase the preset.",
-            file=sys.stderr,
-        )
-        return 4
-    if final_status != "completed":
-        print(f"Research finished with status: {final_status}", file=sys.stderr)
-        return 1
-
-    return 0
+    return RunOutcome(
+        exit_code=exit_code,
+        output_path=args.output,
+        log=payload,
+        result_kind=ResultKind.RESEARCH_REPORT,
+        result=final_response.get("content") or final_response,
+        message=describe_outcome(exit_code, final_status),
+    )
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(finalize(main()))

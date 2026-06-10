@@ -15,7 +15,6 @@ bash example:
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, Mapping
@@ -23,10 +22,13 @@ from typing import Any, Mapping
 from tavily.errors import InvalidAPIKeyError
 
 from tavily_common import (
+    ExitCode,
+    ResultKind,
+    RunOutcome,
     build_response_payload,
     create_tavily_client,
     dedupe_preserve_order,
-    emit_payload,
+    finalize,
 )
 
 
@@ -114,15 +116,20 @@ def run_extract_request(
     }
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None) -> RunOutcome:
+    """Extract URLs and return a ``RunOutcome`` (no I/O; ``finalize()`` emits it).
+
+    ``SUCCESS`` on a completed call, or ``MISSING_API_KEY`` / ``INVALID_API_KEY`` /
+    ``RUNTIME_ERROR`` on the corresponding failure. The success outcome carries an
+    ``EXTRACT_RESULTS`` result.
+    """
     args = parse_args(argv)
     extract_options = resolve_extract_options(args.detail, has_query=bool(args.query))
 
     try:
         client, dotenv_path = create_tavily_client()
     except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+        return RunOutcome(exit_code=ExitCode.MISSING_API_KEY, message=str(exc))
 
     try:
         extraction = run_extract_request(
@@ -132,11 +139,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             extract_options=extract_options,
         )
     except InvalidAPIKeyError as exc:
-        print(f"Invalid Tavily API key: {exc}", file=sys.stderr)
-        return 3
+        return RunOutcome(exit_code=ExitCode.INVALID_API_KEY, message=f"Invalid Tavily API key: {exc}")
     except Exception as exc:
-        print(f"Extraction failed: {exc}", file=sys.stderr)
-        return 1
+        return RunOutcome(exit_code=ExitCode.RUNTIME_ERROR, message=f"Extraction failed: {exc}")
 
     payload = build_response_payload(
         script_name=Path(__file__).name,
@@ -150,10 +155,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         dotenv_path=dotenv_path,
     )
 
-    emit_payload(payload, args.output, public_payload=extraction["response"].get("results") or [])
-
-    return 0
+    return RunOutcome(
+        exit_code=ExitCode.SUCCESS,
+        output_path=args.output,
+        log=payload,
+        result_kind=ResultKind.EXTRACT_RESULTS,
+        result=extraction["response"].get("results") or [],
+    )
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(finalize(main()))

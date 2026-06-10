@@ -16,7 +16,6 @@ bash example:
 from __future__ import annotations
 
 import argparse
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -25,7 +24,15 @@ from tavily.errors import InvalidAPIKeyError
 
 from extract_url_content import run_extract_request
 from search_topic import run_search_request
-from tavily_common import build_response_payload, create_tavily_client, dedupe_preserve_order, emit_payload
+from tavily_common import (
+    ExitCode,
+    ResultKind,
+    RunOutcome,
+    build_response_payload,
+    create_tavily_client,
+    dedupe_preserve_order,
+    finalize,
+)
 
 
 MAX_EXTRACT_URLS = 20
@@ -154,15 +161,22 @@ def select_urls(search_response: dict[str, Any]) -> list[str]:
     return dedupe_preserve_order(urls)[:MAX_EXTRACT_URLS]
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None) -> RunOutcome:
+    """Search, extract the discovered URLs, and return a ``RunOutcome`` (no I/O;
+    ``finalize()`` emits it).
+
+    Returns ``SUCCESS`` when extraction ran; ``EMPTY_RESULT`` when the search
+    produced no URLs to extract (``result`` is then an empty list);
+    ``MISSING_API_KEY`` / ``INVALID_API_KEY`` / ``RUNTIME_ERROR`` on failure. The
+    data outcome carries ``EXTRACT_RESULTS``.
+    """
     args = parse_args(argv)
     pipeline_options = resolve_pipeline_options(args.detail, has_query=bool(args.query))
 
     try:
         client, dotenv_path = create_tavily_client()
     except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+        return RunOutcome(exit_code=ExitCode.MISSING_API_KEY, message=str(exc))
 
     try:
         search_run = run_search_request(
@@ -182,11 +196,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 extract_options=pipeline_options["extract"],
             )
     except InvalidAPIKeyError as exc:
-        print(f"Invalid Tavily API key: {exc}", file=sys.stderr)
-        return 3
+        return RunOutcome(exit_code=ExitCode.INVALID_API_KEY, message=f"Invalid Tavily API key: {exc}")
     except Exception as exc:
-        print(f"Search and extract failed: {exc}", file=sys.stderr)
-        return 1
+        return RunOutcome(exit_code=ExitCode.RUNTIME_ERROR, message=f"Search and extract failed: {exc}")
+
+    exit_code = ExitCode.SUCCESS if selected_urls else ExitCode.EMPTY_RESULT
 
     payload = build_response_payload(
         script_name=Path(__file__).name,
@@ -207,18 +221,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         dotenv_path=dotenv_path,
     )
 
-    emit_payload(
-        payload,
-        args.output,
-        public_payload=(extraction["response"].get("results") or []) if extraction else [],
+    return RunOutcome(
+        exit_code=exit_code,
+        output_path=args.output,
+        log=payload,
+        result_kind=ResultKind.EXTRACT_RESULTS,
+        result=(extraction["response"].get("results") or []) if extraction else [],
+        message="Search returned no URLs to extract." if exit_code is ExitCode.EMPTY_RESULT else None,
     )
-
-    if not selected_urls:
-        print("Search returned no URLs to extract.", file=sys.stderr)
-        return 4
-
-    return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(finalize(main()))

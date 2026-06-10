@@ -1,6 +1,8 @@
 ---
 name: use-tavily
 description: Skill to understand how to utilize Tavily to achieve specific goals in this project. **NOT HOW TO USE TAVILY SDK**. For that, see the `tavily-sdk` skill. 
+# Version 1.0.0
+# 同階層の.envファイルに有効なTAVILY_API_KEYの設定が必要
 ---
 
 ## クエリ言語とドメインフィルタの実務ルール
@@ -52,20 +54,6 @@ description: Skill to understand how to utilize Tavily to achieve specific goals
 - 例: `python ./.claude/skills/use-tavily/src/search_topic.py "Microsoft Fabric overview"`
 - 出力先も bash では `temp/web/search_fabric_overview.json` のように `/` 区切りを使う。
 - PowerShell では `.\.claude\skills\use-tavily\src\search_topic.py` のような Windows 形式でもよい。
-
-## 実装方針
-
-- スクリプトに渡せる引数は最小限にする
-  - Tavily SDK の細かいオプションをそのまま外に出しすぎると、Python でラップする意味が薄くなる
-  - AI や利用者は `--detail=max` のような抽象化された引数を使うことに集中し、Tavily のどのオプションへどう変換するかはスクリプト内のプリセットで制御する
-  - デフォルト値やプリセット対応表は、各スクリプト先頭で編集しやすい形に置く
-- 共通箇所は基本的に `src` 配下の共通モジュールへ切り出す
-  - `.env` 読み込み
-  - Tavily クライアント生成
-  - JSON 出力整形
-  - 共通のレスポンス整形
-- 各スクリプトにはファイル冒頭コメントを書き、用途・最小引数・どこを編集すれば挙動を変えられるかを明示する
-- スクリプトの詳細な引数や最新の使い方は各スクリプトの `--help` を確認する
 
 ## ユースケースごとの使い分け
 
@@ -119,6 +107,21 @@ description: Skill to understand how to utilize Tavily to achieve specific goals
 
 - `temp/web/search_msfabric_overview.json`
 - `temp/web/site_extract_apim_docs.json`
+
+## 出力エンベロープと終了コード
+
+各スクリプトが `--output` に書き出す JSON は **自己記述エンベロープ** で、トップレベルは常に同じ形。生の配列ではない。
+
+```json
+{ "script": "...", "result_kind": "search_results", "exit_code": 0, "result": [ /* 本体 */ ] }
+```
+
+- 後段で結果を読むサブエージェントは、必ず **トップレベルの `result` を取り出してから** 中身を処理する。
+- `result_kind` が `result` の読み方を示す: `search_results` / `extract_results` / `crawl_results`(`list[dict]`)、`site_pages`(`list[dict]`、タイトル記録)、`research_report`(`str` 本文 or `dict`)。
+- `exit_code` でファイル単体でも成否が分かる。`0`=成功、`2`/`3`=API キー不備、`4`=抽出対象 URL が 0 件(`search_extract`/`map_extract`)、`5`=research がタイムアウト、`1`=その他失敗。
+- 全実行のフル詳細(リクエスト/レスポンス)は `src/logs/<script>-log.json` に別途残る。
+
+正本は `src/tavily_common.py` の `ExitCode` / `ResultKind` / `ResultEnvelope`。詳細表は [src/README.md](src/README.md) の「実行結果の戻り値(契約)」。
 
 ## 並列実行・レート・コストの扱い
 

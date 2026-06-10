@@ -21,7 +21,6 @@ from dataclasses import dataclass
 from html import unescape
 from html.parser import HTMLParser
 import re
-import sys
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, Mapping
@@ -30,7 +29,15 @@ from urllib.request import Request, urlopen
 
 from tavily.errors import InvalidAPIKeyError
 
-from tavily_common import build_response_payload, create_tavily_client, dedupe_preserve_order, emit_payload
+from tavily_common import (
+    ExitCode,
+    ResultKind,
+    RunOutcome,
+    build_response_payload,
+    create_tavily_client,
+    dedupe_preserve_order,
+    finalize,
+)
 
 
 DETAIL_PRESETS: dict[str, dict[str, Any]] = {
@@ -391,15 +398,22 @@ def summarize_pages(pages: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def main(argv: Sequence[str] | None = None) -> int:
+def main(argv: Sequence[str] | None = None) -> RunOutcome:
+    """Map a site, resolve titles, and return a ``RunOutcome`` (no I/O; ``finalize()``
+    emits it).
+
+    The success ``result`` is the list of per-page title records (see
+    ``PageTitleResult``), carried as ``SITE_PAGES``. Returns ``SUCCESS`` on a
+    completed call, or ``MISSING_API_KEY`` / ``INVALID_API_KEY`` / ``RUNTIME_ERROR``
+    on the corresponding failure.
+    """
     args = parse_args(argv)
     options = resolve_map_options(args.detail)
 
     try:
         client, dotenv_path = create_tavily_client()
     except ValueError as exc:
-        print(str(exc), file=sys.stderr)
-        return 2
+        return RunOutcome(exit_code=ExitCode.MISSING_API_KEY, message=str(exc))
 
     try:
         map_run = run_map_request(
@@ -416,11 +430,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         mapped_urls = dedupe_preserve_order(map_run["response"].get("results") or [])
         pages = collect_titles(mapped_urls, title_options=options["titles"])
     except InvalidAPIKeyError as exc:
-        print(f"Invalid Tavily API key: {exc}", file=sys.stderr)
-        return 3
+        return RunOutcome(exit_code=ExitCode.INVALID_API_KEY, message=f"Invalid Tavily API key: {exc}")
     except Exception as exc:
-        print(f"Map and title aggregation failed: {exc}", file=sys.stderr)
-        return 1
+        return RunOutcome(exit_code=ExitCode.RUNTIME_ERROR, message=f"Map and title aggregation failed: {exc}")
 
     payload = build_response_payload(
         script_name=Path(__file__).name,
@@ -444,9 +456,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         dotenv_path=dotenv_path,
     )
 
-    emit_payload(payload, args.output, public_payload=pages)
-    return 0
+    return RunOutcome(
+        exit_code=ExitCode.SUCCESS,
+        output_path=args.output,
+        log=payload,
+        result_kind=ResultKind.SITE_PAGES,
+        result=pages,
+    )
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(finalize(main()))

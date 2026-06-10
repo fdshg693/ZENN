@@ -1,9 +1,29 @@
 ---
+# Version 1.0.0
 name: use-tavily
 description: Skill to understand how to utilize Tavily to achieve specific goals in this project. **NOT HOW TO USE TAVILY SDK**. For that, see the `tavily-sdk` skill. 
-# Version 1.0.0
+
 # 同階層の.envファイルに有効なTAVILY_API_KEYの設定が必要
+# Python が使える環境
+# tavily / python-dotenv がグローバルにインストールされていること
+# 短縮コマンド tav を使うには、初回のみ `pip install -e .claude/skills/use-tavily` を実行する
 ---
+
+## エントリポイント: `tav` コマンド
+
+| サブコマンド | 対応スクリプト | 概要 |
+|------|------|------|
+| `tav search` | `src/search_topic.py` | キーワード → 関連 URL とスニペット |
+| `tav search-extract` | `src/search_extract_topic.py` | キーワード → 関連 URL → 本文抽出まで |
+| `tav research` | `src/research_topic.py` | 問いを Tavily research に投げてレポートを待つ |
+| `tav extract` | `src/extract_url_content.py` | 既知 URL → 本文抽出 |
+| `tav map` | `src/map_site_titles.py` | サイトルート → URL 一覧 + タイトル |
+| `tav map-extract` | `src/map_extract_site_content.py` | サイトを map してから対象 URL を extract |
+| `tav crawl` | `src/crawl_site_content.py` | サイトをクロールして関連本文を収集 |
+
+- 引数の確認: `tav <サブコマンド> --help`、サブコマンド一覧: `tav`(引数なし)。
+- 編集は editable install なので、スクリプトを直したら再インストール不要でそのまま反映される。
+- `tav` が未インストールの環境では、従来どおり `python .\.claude\skills\use-tavily\src\<script>.py ...` でも動く。以下の例は `tav` 形で示す。
 
 ## クエリ言語とドメインフィルタの実務ルール
 
@@ -19,7 +39,7 @@ description: Skill to understand how to utilize Tavily to achieve specific goals
 
 ```text
 1. すでに対象 URL が分かっているか?
-   Yes -> src/extract_url_content.py
+   Yes -> tav extract
    No  -> 2 へ
 
 2. すでに対象サイトのルート URL が分かっているか?
@@ -27,33 +47,32 @@ description: Skill to understand how to utilize Tavily to achieve specific goals
    No  -> 4 へ
 
 3. サイトに対して何をしたいか?
-   ページ一覧や構造を見たい              -> src/map_site_titles.py
-   サイト本文を一気に回収したい          -> src/crawl_site_content.py
-   先に候補 URL を見てから本文抽出したい -> src/map_extract_site_content.py
+   ページ一覧や構造を見たい              -> tav map
+   サイト本文を一気に回収したい          -> tav crawl
+   先に候補 URL を見てから本文抽出したい -> tav map-extract
 
 4. 手元にあるのは topic / question / keyword だけか?
    Yes -> 5 へ
   No  -> 追加の入力条件を整理してから再判定
 
 5. キーワード起点なら何がほしいか?
-   まず関連 URL と要約だけ見たい        -> src/search_topic.py
-   まず根拠 URL を広く集めたい           -> src/search_topic.py
-   関連 URL の本文まで続けて取りたい     -> src/search_extract_topic.py
-   AI に調査と要約まで任せたい           -> src/research_topic.py
+   まず関連 URL と要約だけ見たい        -> tav search
+   まず根拠 URL を広く集めたい           -> tav search
+   関連 URL の本文まで続けて取りたい     -> tav search-extract
+   AI に調査と要約まで任せたい           -> tav research
 ```
 
 迷った場合のデフォルトは以下。
 
-- topic 起点なら、まず `src/search_topic.py`
-- URL 起点なら、まず `src/extract_url_content.py`
-- サイト起点なら、まず `src/map_site_titles.py`
+- topic 起点なら、まず `tav search`
+- URL 起点なら、まず `tav extract`
+- サイト起点なら、まず `tav map`
 
 ## Windows / bash の注意
 
-- Windows 上で bash を使う場合、パスは `./` と `/` を使う。Windows 形式の相対パスや `\` 区切りは避ける。
-- 例: `python ./.claude/skills/use-tavily/src/search_topic.py "Microsoft Fabric overview"`
-- 出力先も bash では `temp/web/search_fabric_overview.json` のように `/` 区切りを使う。
-- PowerShell では `.\.claude\skills\use-tavily\src\search_topic.py` のような Windows 形式でもよい。
+- `tav` はインストール済みなら PowerShell でも bash でもそのまま `tav search "..."` で呼べる(PATH 上の console コマンドなので、シェルによるパス記法の差を受けない)。
+- 出力先パスは記法の差が残る。bash では `temp/web/search_fabric_overview.json` のように `/` 区切り、PowerShell では `temp\web\search_fabric_overview.json` のように `\` 区切りを使う。
+- `tav` を使わず生のスクリプトを叩く場合のみ、bash では `python ./.claude/skills/use-tavily/src/search_topic.py "..."` のように `./` と `/` を使い、`\` 区切りは避ける。
 
 ## ユースケースごとの使い分け
 

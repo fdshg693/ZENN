@@ -13,6 +13,11 @@ __pycache__/
 *.pyd
 *.pyw
 *.pyz
+
+# Python packaging / editable-install artifacts
+*.egg-info/
+build/
+dist/
 *.pywz
 *.pyzw
 *.pyz

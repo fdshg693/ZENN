@@ -18,15 +18,16 @@
   - **戻り値の契約**(`ExitCode` / `ResultKind` / `ResultEnvelope` / `ResponseEnvelope` / `OutputChannel` / `RunOutcome` / `emit()` / `finalize()`)。終了コード・出力形状・出力先はここの列挙/`TypedDict`/`dataclass` が正本(詳細は後述の「実行結果の戻り値(契約)」)
 - 各スクリプトにはファイル冒頭コメントを書き、用途・最小引数・どこを編集すれば挙動を変えられるかを明示する
 - スクリプトの詳細な引数や最新の使い方は各スクリプトの `--help` を確認する
+- 複数スクリプトは薄いディスパッチャ `tav_cli.py` で 1 つのエントリポイントにまとめ、`pyproject.toml` の `[project.scripts]` 経由で `tav` という console コマンドとして公開する。`tav <サブコマンド>` は対応スクリプトの `main(argv)` に残り引数を委譲するだけで、各スクリプトの引数・プリセット・戻り値契約は不変。サブコマンド対応表は [SKILL.md](../SKILL.md) の「エントリポイント: `tav` コマンド」を参照
 
 ## クイックスタート
 
 1. Tavily API キーを `.claude/skills/use-tavily/.env` に書くか、環境変数 `TAVILY_API_KEY` にセット
-2. `pip install tavily python-dotenv` を実行
+2. 短縮コマンドを入れる: `pip install -e .claude/skills/use-tavily`(依存の `tavily-python` / `python-dotenv` も一緒に入る。`tav` を使わないなら `pip install tavily python-dotenv` だけでも可)
 3. 一番簡単なキーワード検索を試す:
 
 ```bash
-python ./.claude/skills/use-tavily/src/search_topic.py "Microsoft Fabric overview" \
+tav search "Microsoft Fabric overview" \
   --include-domain learn.microsoft.com \
   --output temp/web/search_msfabric_overview.json
 ```
@@ -34,16 +35,18 @@ python ./.claude/skills/use-tavily/src/search_topic.py "Microsoft Fabric overvie
 PowerShell の場合:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\search_topic.py "Microsoft Fabric overview" `
+tav search "Microsoft Fabric overview" `
   --include-domain learn.microsoft.com `
   --output temp\web\search_msfabric_overview.json
 ```
 
-各スクリプトの引数詳細は `--help` で確認できます。
+各サブコマンドの引数詳細は `--help` で確認できます(サブコマンド一覧は引数なしの `tav`)。
 
 ```bash
-python ./.claude/skills/use-tavily/src/search_topic.py --help
+tav search --help
 ```
+
+`tav` を入れない場合は、従来どおりスクリプトを直接実行してもよい(`python ./.claude/skills/use-tavily/src/search_topic.py "..." --help`)。
 
 ## 実行結果の戻り値(契約)
 

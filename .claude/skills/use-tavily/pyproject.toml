@@ -1,0 +1,42 @@
+# Packaging for the `use-tavily` skill's wrapper scripts.
+#
+# Install once (from this directory or the repo root) so the short `tav` command
+# is on PATH, the same way tools like `ruff`/`black` get a console command:
+#
+#     pip install -e .claude/skills/use-tavily
+#
+# pip writes a `tav` (Windows: tav.exe) shim into the environment's Scripts/bin
+# directory, which is already on PATH — no manual PATH editing, no EXE build.
+# The wrapper modules are installed as editable top-level modules pointing back
+# at src/, so editing a script takes effect without reinstalling.
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "zenn-use-tavily"
+version = "1.0.0"
+description = "Thin CLI wrappers around Tavily for the ZENN article-writing skill"
+requires-python = ">=3.11"
+dependencies = [
+    "tavily-python",
+    "python-dotenv",
+]
+
+[project.scripts]
+tav = "tav_cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = [
+    "tav_cli",
+    "tavily_common",
+    "search_topic",
+    "search_extract_topic",
+    "research_topic",
+    "extract_url_content",
+    "map_site_titles",
+    "map_extract_site_content",
+    "crawl_site_content",
+]

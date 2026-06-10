@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -55,7 +56,7 @@ REQUEST_TIMEOUT_SECONDS = 60.0
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Run Tavily research with minimal arguments and wait for completion."
     )
@@ -74,7 +75,7 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         help="Optional path to write the JSON response.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def wait_for_research_completion(client: Any, request_id: str, *, detail: str) -> tuple[dict[str, Any], bool, float]:
@@ -114,7 +115,7 @@ def describe_outcome(exit_code: ExitCode, final_status: str | None) -> str | Non
     return None
 
 
-def main() -> RunOutcome:
+def main(argv: Sequence[str] | None = None) -> RunOutcome:
     """Run research, wait for completion, and return a ``RunOutcome`` (no I/O;
     ``finalize()`` emits it).
 
@@ -124,7 +125,7 @@ def main() -> RunOutcome:
     window; ``RUNTIME_ERROR`` on failure or a failed/cancelled terminal status;
     ``MISSING_API_KEY`` / ``INVALID_API_KEY`` on credential problems.
     """
-    args = parse_args()
+    args = parse_args(argv)
     preset = DETAIL_PRESETS[args.detail]
 
     try:

@@ -1,8 +1,18 @@
 ---
+# Version 1.0.0
 name: zenn
 description: ZENN記事を、事前調査→概要提案→ユーザー承認→調査→plan→承認→publish の順で進めるスキル
 disable-model-invocation: false
 user-invocable: true
+
+# use-tavilyスキルを前提
+# - 同階層の.envファイルに有効なTAVILY_API_KEYの設定が必要
+# - Python が使える環境
+# - tavily / python-dotenv がグローバルにインストールされていること
+# - 短縮コマンド tav を使うには、初回のみ `pip install -e .claude/skills/use-tavily` を実行する 
+
+# 関連スキルとして、zenn-refineスキルがある。
+# - このスキルの後続として使うことで、本番ZENN記事に近い質のアウトプットを目指すことができる
 ---
 
 以下の手順で ZENN 記事を作成してください。
@@ -51,19 +61,19 @@ user-invocable: true
 
 ## 0. 事前確認
 
-まず `.claude\skills\use-tavily\SKILL.md` を読み、このスキルを使う前提で進めてください。
+まず `.claude\skills\use-tavily\SKILL.md` を読み、このスキルを使う前提で進めてください。外部情報の収集は短縮コマンド `tav <サブコマンド>` で呼ぶ(未インストール環境では従来どおり `python .\.claude\skills\use-tavily\src\<script>.py` でも可)。
 
-利用する主なスクリプト:
+利用する主なコマンド:
 
-- `src/search_topic.py`: キーワードから関連 URL を探す
-- `src/search_extract_topic.py`: キーワードから関連 URL を探し、そのまま内容も抽出する
-- `src/research_topic.py`: 調査タスクをまとめて Tavily に任せる
-- `src/extract_url_content.py`: 既知の URL 群から内容を抽出する
-- `src/map_site_titles.py`: 公式 Docs サイト内の URL 一覧とタイトルを把握する
-- `src/map_extract_site_content.py`: サイトをマップしてから対象 URL の内容を抽出する
-- `src/crawl_site_content.py`: 特定サイトを直接クロールして内容を集める
+- `tav search`: キーワードから関連 URL を探す
+- `tav search-extract`: キーワードから関連 URL を探し、そのまま内容も抽出する
+- `tav research`: 調査タスクをまとめて Tavily に任せる
+- `tav extract`: 既知の URL 群から内容を抽出する
+- `tav map`: 公式 Docs サイト内の URL 一覧とタイトルを把握する
+- `tav map-extract`: サイトをマップしてから対象 URL の内容を抽出する
+- `tav crawl`: 特定サイトを直接クロールして内容を集める
 
-必要に応じて各スクリプトの `--help` も確認してください。
+必要に応じて各コマンドの `tav <サブコマンド> --help` も確認してください。
 
 出力ファイルは基本的に `temp\{unique_name_per_article}\` 以下へ保存してください。記事ごとにトピック名のスラッグを決め、以下のように整理します。
 
@@ -125,7 +135,7 @@ user-invocable: true
 例:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\search_topic.py "Azure API Management OpenAI integration" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --output temp\{unique_name_per_article}\search_apim_openai_overview.json
+tav search "Azure API Management OpenAI integration" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --output temp\{unique_name_per_article}\search_apim_openai_overview.json
 ```
 
 より「問い」に近いテーマで、概要までまとめてほしい場合は `research_topic.py` を使っても構いません。
@@ -133,7 +143,7 @@ python .\.claude\skills\use-tavily\src\search_topic.py "Azure API Management Ope
 例:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\research_topic.py "Azure API Management で Azure OpenAI を公開する設計上のポイントを整理してください。公式 Docs と Github を優先し、記事概要の判断に必要な最新論点をまとめてください。" --detail balanced --output temp\{unique_name_per_article}\research_apim_openai_overview.json
+tav research "Azure API Management で Azure OpenAI を公開する設計上のポイントを整理してください。公式 Docs と Github を優先し、記事概要の判断に必要な最新論点をまとめてください。" --detail balanced --output temp\{unique_name_per_article}\research_apim_openai_overview.json
 ```
 
 ### 1.b 軽い事前調査で止めてよいライン
@@ -212,7 +222,7 @@ python .\.claude\skills\use-tavily\src\research_topic.py "Azure API Management �
 `.claude\skills\use-tavily\SKILL.md` を先に読んでください。
 
 {keyword1 keyword2 ...} に関する最新の情報を収集してください。
-一般的な WEB 検索ツールではなく、`.claude\skills\use-tavily\src\search_topic.py` または必要に応じて `src\research_topic.py` を使ってください。
+一般的な WEB 検索ツールではなく、`tav search` または必要に応じて `tav research` を使ってください(`.claude\skills\use-tavily\SKILL.md` 参照)。
 
 まずは参考になる公式 Docs や GitHub を確定させてください。
 そのうえで、公式 Docs を中心に参照すべき URL とそれらのタイトルを整理し、`temp\{unique_name_per_article}\search_{keyword1_keyword2_...}.md` に保存してください。(スクリプトの出力をそのまま使うのでなく、スクリプトの結果を元に不要箇所の削除等を行い、読みやすい形に整形してください)
@@ -229,13 +239,13 @@ python .\.claude\skills\use-tavily\src\research_topic.py "Azure API Management �
 推奨コマンド例:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\search_topic.py "Azure API Management policy expressions" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --output temp\{unique_name_per_article}\search_apim_policy_expressions.json
+tav search "Azure API Management policy expressions" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --output temp\{unique_name_per_article}\search_apim_policy_expressions.json
 ```
 
 広めに調査して論点整理も必要なら:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\research_topic.py "Azure API Management policy expressions の最新情報を整理してください。公式 Docs と Github を優先し、記事執筆で先に読むべき資料を洗い出してください。" --detail balanced --output temp\{unique_name_per_article}\research_apim_policy_expressions.json
+tav research "Azure API Management policy expressions の最新情報を整理してください。公式 Docs と Github を優先し、記事執筆で先に読むべき資料を洗い出してください。" --detail balanced --output temp\{unique_name_per_article}\research_apim_policy_expressions.json
 ```
 
 ### 2.c URL 候補から、読むべき資料を特定する
@@ -256,7 +266,7 @@ URL がすでに決まっている場合は `extract_url_content.py` を使っ�
 例:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\extract_url_content.py https://learn.microsoft.com/azure/api-management/api-management-policies https://learn.microsoft.com/azure/api-management/api-management-policy-expressions --query "APIM policy で何ができるか、制約、実務上重要な注意点" --detail balanced --output temp\{unique_name_per_article}\extract_apim_policies.json
+tav extract https://learn.microsoft.com/azure/api-management/api-management-policies https://learn.microsoft.com/azure/api-management/api-management-policy-expressions --query "APIM policy で何ができるか、制約、実務上重要な注意点" --detail balanced --output temp\{unique_name_per_article}\extract_apim_policies.json
 ```
 
 キーワードから候補 URL の抽出まで含めて一気に行いたい場合は `search_extract_topic.py` を使ってください。
@@ -264,7 +274,7 @@ python .\.claude\skills\use-tavily\src\extract_url_content.py https://learn.micr
 例:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\search_extract_topic.py "Azure API Management policy expressions limitations" --detail balanced --include-domain learn.microsoft.com --output temp\{unique_name_per_article}\extract_apim_policy_limitations.json
+tav search-extract "Azure API Management policy expressions limitations" --detail balanced --include-domain learn.microsoft.com --output temp\{unique_name_per_article}\extract_apim_policy_limitations.json
 ```
 
 公式 Docs サイト全体の構造を先に見たい場合は `map_site_titles.py` を使ってください。
@@ -272,7 +282,7 @@ python .\.claude\skills\use-tavily\src\search_extract_topic.py "Azure API Manage
 例:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\map_site_titles.py https://learn.microsoft.com/azure/api-management/ --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_map_apim_docs.json
+tav map https://learn.microsoft.com/azure/api-management/ --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_map_apim_docs.json
 ```
 
 特定サイトから関連ページ本文をまとめて収集したい場合は `map_extract_site_content.py` を使ってください。
@@ -280,7 +290,7 @@ python .\.claude\skills\use-tavily\src\map_site_titles.py https://learn.microsof
 例:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\map_extract_site_content.py https://learn.microsoft.com/azure/api-management/ --query "self-hosted gateway architecture, limitations, pricing-related considerations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_extract_apim_gateway.json
+tav map-extract https://learn.microsoft.com/azure/api-management/ --query "self-hosted gateway architecture, limitations, pricing-related considerations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_extract_apim_gateway.json
 ```
 
 サイト全体を直接クロールしたい場合は `crawl_site_content.py` を使ってください。対象サイトが限定されていて、関連情報を広く拾いたい場合に向いています。
@@ -288,7 +298,7 @@ python .\.claude\skills\use-tavily\src\map_extract_site_content.py https://learn
 例:
 
 ```powershell
-python .\.claude\skills\use-tavily\src\crawl_site_content.py https://learn.microsoft.com/azure/api-management/ --query "workspace feature, v2 tiers, current limitations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_crawl_apim_workspace.json
+tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace feature, v2 tiers, current limitations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --output temp\{unique_name_per_article}\site_crawl_apim_workspace.json
 ```
 
 ### 2.e 追加調査の原則
@@ -342,7 +352,7 @@ python .\.claude\skills\use-tavily\src\crawl_site_content.py https://learn.micro
 - 主に参照する URL: {url1, url2, ...}
 
 まずは指定された JSON 調査結果と URL を読み、根拠を確認してください。
-根拠が不足する場合のみ、`.claude\skills\use-tavily\src\extract_url_content.py` または `src\search_extract_topic.py` を使って追加調査してください。
+根拠が不足する場合のみ、`tav extract` または `tav search-extract` を使って追加調査してください。
 一般的な WEB 検索ツールは使わないでください。
 
 出力では以下を返してください。

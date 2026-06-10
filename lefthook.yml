@@ -1,0 +1,16 @@
+# lefthook: Git フック管理。
+#
+# 初回セットアップ(lefthook 本体を入れたあと、1度だけ):
+#   npx lefthook install        # .git/hooks にフックを配置
+#   ※ lefthook を npm 経由で使うなら先に: npm i -D lefthook
+#   ※ もしくはバイナリ/scoop 等で入れた lefthook を使うなら: lefthook install
+#
+# このフックは「スキル配下を変更したのに version 更新を忘れた」コミットを止めます。
+# 各スキルの version は独立(整合性チェックはしない)。
+# use-tavily は SKILL.md / pyproject.toml のどちらか一方の version 値が変われば OK。
+pre-commit:
+  commands:
+    skill-version-guard:
+      # スキルディレクトリに変更があるときだけ起動(無関係なコミットは素通り)
+      glob: ".claude/skills/**"
+      run: python scripts/check_skill_versions.py

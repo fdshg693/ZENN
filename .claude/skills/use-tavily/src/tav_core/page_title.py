@@ -1,4 +1,4 @@
-r"""Direct HTML title fetching, shared by the wrapper scripts.
+"""Direct HTML title fetching, shared by the wrapper scripts.
 
 This module owns the *local* (non-Tavily) way to resolve a page title: fetch the
 URL over plain HTTP, parse ``<title>`` / ``og:title`` / ``twitter:title`` out of
@@ -7,13 +7,13 @@ is never used for titles (an explicit project requirement) — only this code is
 
 Two consumers share it:
   * ``map_site_titles.py`` resolves a title for every mapped URL.
-  * ``tavily_common.py`` back-fills a ``title`` for content-series results whose
+  * ``topic_layout.py`` back-fills a ``title`` for content-series results whose
     items arrive without one (notably ``crawl``'s ``CrawlResultItem``, which is
     ``url`` + ``raw_content`` only) before splitting them into per-URL files.
 
 Edit the fetch defaults (user agent, timeout, byte cap, worker count) in the
 constants below. ``PageTitleResult`` mirrors the ``SitePageItem`` TypedDict in
-``tavily_common.py``; keep the two in sync.
+``tavily_types.py``; keep the two in sync.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ TITLE_FALLBACK_LABEL = "Untitled"
 TITLE_SEPARATOR_PATTERN = re.compile(r"\s*[|\-:–—]\s*")
 
 # Shared default fetch budget. ``map_site_titles`` still overrides these per
-# ``--detail`` preset; ``tavily_common``'s title back-fill uses these as-is.
+# ``--detail`` preset; ``topic_layout``'s title back-fill uses these as-is.
 DEFAULT_TITLE_OPTIONS: dict[str, Any] = {
     "max_workers": 6,
     "timeout_seconds": 12.0,

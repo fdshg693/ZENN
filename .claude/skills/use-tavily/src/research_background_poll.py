@@ -5,7 +5,7 @@ interactive caller (often an AI agent) is never stuck waiting on a slow research
 job. When that window closes with the job still running server-side,
 ``research_topic.py`` returns ``INCOMPLETE`` immediately and asks ``finalize()`` to
 spawn THIS script fully detached (see ``BackgroundTask`` / ``spawn_detached`` in
-``tavily_common``). It keeps polling ``get_research`` for a much longer *background*
+``tav_core``). It keeps polling ``get_research`` for a much longer *background*
 window and:
 
 - on completion, writes the same ``NNNN-<slug>.md`` report into the topic's
@@ -33,7 +33,7 @@ from pathlib import Path
 
 from tavily.errors import InvalidAPIKeyError
 
-from tavily_common import (
+from tav_core import (
     ExitCode,
     ResultKind,
     RunOutcome,

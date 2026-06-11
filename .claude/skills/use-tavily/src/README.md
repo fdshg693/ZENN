@@ -10,12 +10,16 @@
   - Tavily SDK の細かいオプションをそのまま外に出しすぎると、Python でラップする意味が薄くなる
   - AI や利用者は `--detail=max` のような抽象化された引数を使うことに集中し、Tavily のどのオプションへどう変換するかはスクリプト内のプリセットで制御する
   - デフォルト値やプリセット対応表は、各スクリプト先頭で編集しやすい形に置く
-- 共通箇所は基本的に `tavily_common.py` へ切り出す
-  - `.env` 読み込み
-  - Tavily クライアント生成
-  - JSON 出力整形
-  - 共通のレスポンス整形
-  - **戻り値の契約**(`ExitCode` / `ResultKind` / `ResultEnvelope` / `ResponseEnvelope` / `OutputChannel` / `RunOutcome` / `emit()` / `finalize()`)。終了コード・出力形状・出力先はここの列挙/`TypedDict`/`dataclass` が正本(詳細は後述の「実行結果の戻り値(契約)」)
+- 共通箇所は `tav_core/` パッケージへ切り出す(以前の単一巨大ファイル `tavily_common.py` を責務ごとに分割したもの)
+  - `tav_core/environment.py` … `.env` 読み込み・Tavily クライアント生成・環境変数トグル
+  - `tav_core/output.py` … JSON 整形・エンベロープ組み立て・唯一の出力シンク `emit()`
+  - `tav_core/topic_layout.py` … 役割別の出力ライタ群(`--topic` の置き場決定。「何をどこへ」だけを担う)
+  - `tav_core/run_shell.py` … 命令的シェル `finalize()`(`RunOutcome` → 副作用)とデタッチプロセス起動 `spawn_detached`
+  - `tav_core/projection.py` … 結果アイテムを調査に要る列へ投影する `slim_result_item` / `project_result`
+  - `tav_core/result_contract.py` … **戻り値の契約**(`ExitCode` / `ResultKind` / `ResultEnvelope` / `ResponseEnvelope` / `OutputChannel` / `RunOutcome` / `TopicArtifact` / `BackgroundTask` と役割レイアウト表)。終了コード・出力形状・出力先はここの列挙/`TypedDict`/`dataclass` が正本(詳細は後述の「実行結果の戻り値(契約)」)
+  - `tav_core/tavily_types.py` … Tavily の各レスポンス要素型(実測で確定した `TypedDict`)
+  - `tav_core/page_title.py` … HTML 直 Fetch のタイトル取得 / `tav_core/text_utils.py` … `slugify` / `dedupe_preserve_order`
+  - 公開シンボルは `tav_core/__init__.py` が再エクスポートするので、各スクリプトは `from tav_core import ...` だけ書けば内部のファイル分割に依存しない
 - 各スクリプトにはファイル冒頭コメントを書き、用途・最小引数・どこを編集すれば挙動を変えられるかを明示する
 - スクリプトの詳細な引数や最新の使い方は各スクリプトの `--help` を確認する
 - 複数スクリプトは薄いディスパッチャ `tav_cli.py` で 1 つのエントリポイントにまとめ、`pyproject.toml` の `[project.scripts]` 経由で `tav` という console コマンドとして公開する。`tav <サブコマンド>` は対応スクリプトの `main(argv)` に残り引数を委譲するだけで、各スクリプトの引数・プリセット・戻り値契約は不変。サブコマンド対応表は [SKILL.md](../SKILL.md) の「エントリポイント: `tav` コマンド」を参照
@@ -42,7 +46,7 @@ tav search "Microsoft Fabric overview" `
 
 `--topic <name>` を渡すと `<TAVILY_OUTPUT_DIR>/<topic>/`(`.env` の `TAVILY_OUTPUT_DIR`、未設定時は `temp/web`)配下に書き出します。`--topic` を省くと単一 `ResultEnvelope` を stdout に出します(パイプ用途)。
 
-`TAVILY_OUTPUT_DIR` の解決基準: 絶対パスはそのまま、相対パス(既定 `temp/web` を含む)は **実行時のカレントディレクトリ基準**で解決します(`.env` やスクリプトの場所ではない)。正本は `tavily_common.get_output_dir()` の docstring。`./temp/web/<topic>/` に出すにはリポジトリルートから実行してください。
+`TAVILY_OUTPUT_DIR` の解決基準: 絶対パスはそのまま、相対パス(既定 `temp/web` を含む)は **実行時のカレントディレクトリ基準**で解決します(`.env` やスクリプトの場所ではない)。正本は `tav_core.environment.get_output_dir()` の docstring。`./temp/web/<topic>/` に出すにはリポジトリルートから実行してください。
 
 各サブコマンドの引数詳細は `--help` で確認できます(サブコマンド一覧は引数なしの `tav`)。
 
@@ -54,7 +58,7 @@ tav search --help
 
 ## 実行結果の戻り値(契約)
 
-CLI の戻り値は **終了コード・出力データ・監査ログ・出力先** の 4 つの契約に分かれ、いずれも `tavily_common.py` の型/列挙で固定しています。コメントではなく実体(`IntEnum` / `Enum` / `TypedDict` / `dataclass`)が正本で、この表はその写しです。
+CLI の戻り値は **終了コード・出力データ・監査ログ・出力先** の 4 つの契約に分かれ、いずれも `tav_core/result_contract.py` の型/列挙で固定しています。コメントではなく実体(`IntEnum` / `Enum` / `TypedDict` / `dataclass`)が正本で、この表はその写しです。
 
 ### 内部構造 — functional core / imperative shell
 
@@ -69,7 +73,7 @@ if __name__ == "__main__":
 
 これにより `main()` の本当の成果物(payload と終了コード)が **戻り値として型に現れる**。stdout やファイルを捕捉せずに `main(argv)` を呼んで結果を検証・合成できる(`finalize` を呼ばなければ何も書かれない)。エラー時(API キー不備・例外)は `RunOutcome` の `log` を `None` にして返し、`finalize` は出力エンベロープを書かず `message` だけを stderr に出す。
 
-### 1. プロセス終了コード — `ExitCode`(`tavily_common.py`)
+### 1. プロセス終了コード — `ExitCode`(`tav_core/result_contract.py`)
 
 全スクリプトの `main()` は `ExitCode` のメンバーを返します。呼び出し側はこの整数で分岐できます。
 
@@ -142,7 +146,7 @@ content 系の `pages/index.json` が唯一の url↔ファイル対応表で、
 >
 > 合成コマンド(`search_extract` / `map_extract`)は **discovery 半分も残す**。primary の `result`(= extract 本文)は `pages/` に書きつつ、検索 / map のメニューを `search/` / `map/` にも書く。`RunOutcome.discovery`(`TopicArtifact`)がこの 2 つ目の役割出力を担い、stdout 経路では無視される(パイプ契約は 1 エンベロープのまま)。
 
-各 `*Item` は `tavily_common.py` の `TypedDict` で **実際の API レスポンスから実測して確定** させた型です(ドキュメントではなく実体が正本)。スクリプトの固定フラグ(`include_raw_content` / `include_images` / `include_favicon` はすべて False)前提なので、例えば search は `raw_content` キーを常に持つが値は `None`、extract は未ドキュメントの `title` を必ず持つ、といった実測事実を反映しています。
+各 `*Item` は `tav_core/tavily_types.py` の `TypedDict` で **実際の API レスポンスから実測して確定** させた型です(ドキュメントではなく実体が正本)。スクリプトの固定フラグ(`include_raw_content` / `include_images` / `include_favicon` はすべて False)前提なので、例えば search は `raw_content` キーを常に持つが値は `None`、extract は未ドキュメントの `title` を必ず持つ、といった実測事実を反映しています。
 
 - 型を **どう実測して確定したか**(プローブ各種・fixtures 再生成)→ [../experiments/README.md](../experiments/README.md)
 - 型が **実 API と一致することの検証**(オフライン構造検証 + `TAVILY_LIVE_TESTS=1` のライブ再検証)→ [../tests/README.md](../tests/README.md)
@@ -185,8 +189,17 @@ content 系の `pages/index.json` が唯一の url↔ファイル対応表で、
 ```text
 src/
 ├── README.md                    ← このファイル(Python コードの説明)
-├── tavily_common.py             ← .env 読込、クライアント生成、JSON 整形、戻り値契約(ExitCode/ResultKind/各 Envelope/OutputChannel/RunOutcome/TopicArtifact/emit/finalize)、役割別出力ライタ(discovery/content/report)・slug/連番採番・.md レンダラ・投影・title 補完
-├── title_fetch.py               ← HTML を直接 Fetch してページタイトルを取得(map_site_titles と、tavily_common の分割系 title 補完が共有)
+├── tav_core/                    ← 共通実装パッケージ(旧 tavily_common.py を責務分割)
+│   ├── __init__.py              ← 公開シンボルの再エクスポート(`from tav_core import ...` の窓口)
+│   ├── result_contract.py       ← 戻り値契約: ExitCode / ResultKind / 各 Envelope / OutputChannel / RunOutcome / TopicArtifact / BackgroundTask / 役割レイアウト表
+│   ├── tavily_types.py          ← Tavily の各レスポンス要素型(実測で確定した TypedDict)
+│   ├── environment.py           ← .env 読込・Tavily クライアント生成・環境変数トグル(WRITE_LOG / OUTPUT_DIR ほか)
+│   ├── output.py                ← JSON 整形・エンベロープ組み立て・唯一の出力シンク emit()
+│   ├── topic_layout.py          ← 役割別出力ライタ(discovery/content/report)・slug/連番採番・.md レンダラ・title 補完(「何をどこへ」だけ)
+│   ├── run_shell.py             ← 命令的シェル finalize()(RunOutcome→副作用)+ デタッチプロセス起動 spawn_detached
+│   ├── projection.py            ← 結果アイテムを調査に要る列へ投影(slim_result_item / project_result)
+│   ├── page_title.py            ← HTML 直 Fetch でタイトル取得(map_site_titles と topic_layout の title 補完が共有)
+│   └── text_utils.py            ← slugify / dedupe_preserve_order(汎用テキスト/列ヘルパ)
 ├── search_topic.py              ← キーワード検索の最小ラッパー
 ├── search_extract_topic.py      ← search → extract の合成
 ├── research_topic.py            ← Research API ラッパー(前景待機 + 前景未完了時に背景 poller を起動)
@@ -195,8 +208,11 @@ src/
 ├── map_site_titles.py           ← サイトの URL 一覧 + タイトル
 ├── map_extract_site_content.py  ← map → extract の合成
 ├── crawl_site_content.py        ← サイトクロール + 本文回収
+├── tav_cli.py                   ← サブコマンドを各ラッパーへ振り分ける薄いディスパッチャ(`tav` の実体)
 └── logs/                        ← 各実行のリクエスト/レスポンス JSON
 ```
+
+コマンドラッパー(`search_topic.py` 等)と `tav_cli.py` は **トップレベルのまま** にしてある。`python ./.claude/skills/use-tavily/src/<script>.py` の直接実行と、`tav_cli` の `importlib` ディスパッチをそのまま動かすため。共通実装だけを `tav_core/` パッケージにまとめている。
 
 ## カスタマイズ箇所
 
@@ -207,7 +223,8 @@ src/
 | `include_answer` / `include_raw_content` などの固定フラグ | 各スクリプト冒頭の定数(`INCLUDE_ANSWER` 等) |
 | タイムアウト | 各スクリプトの `REQUEST_TIMEOUT_SECONDS` |
 | `research` の前景 / 背景待機(`foreground_wait_seconds` / `background_wait_seconds` とポーリング間隔) | `research_topic.py` の `DETAIL_PRESETS`(実測の根拠は `../experiments/measure_research_timing.py`) |
-| `.env` 読み込み挙動・JSON 出力フォーマット | `tavily_common.py` |
+| `.env` 読み込み挙動 | `tav_core/environment.py` |
+| JSON 出力フォーマット・出力シンク `emit()` | `tav_core/output.py` |
 | 出力先ベースディレクトリ(`--topic` の解決先、未設定時 `temp/web`) | `.env` の `TAVILY_OUTPUT_DIR` |
 | 監査ログ `logs/<script>-log.json` を書くか(未設定=`true`、`false`/`0`/`no`/`off`/空で抑止) | `.env` の `TAVILY_WRITE_LOG` |
 | 監査ログのパス通知「Wrote full log to <path>」を出すか(未設定=`true`、falsey で抑止。監査ログ書き込み時のみ。結果ファイルのパス通知は常に表示) | `.env` の `TAVILY_SHOW_LOG_PATH` |

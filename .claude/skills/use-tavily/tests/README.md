@@ -1,6 +1,6 @@
 # Tavily ラッパーの型テスト
 
-このディレクトリは、各ラッパースクリプトが返す **結果オブジェクトの型** が確かに正しいことを検証するテスト群です。型の正本は [`../src/tavily_common.py`](../src/tavily_common.py) の `TypedDict`(`SearchResultItem` / `ExtractResultItem` / `ExtractFailedItem` / `CrawlResultItem` / `SitePageItem` / `ResearchSource` / `CompletedResearchResponse`)で、それらが **実際の Tavily API レスポンスと一致すること** をここで担保します。
+このディレクトリは、各ラッパースクリプトが返す **結果オブジェクトの型** が確かに正しいことを検証するテスト群です。型の正本は [`../src/tav_core/tavily_types.py`](../src/tav_core/tavily_types.py) の `TypedDict`(`SearchResultItem` / `ExtractResultItem` / `ExtractFailedItem` / `CrawlResultItem` / `SitePageItem` / `ResearchSource` / `CompletedResearchResponse`)で、それらが **実際の Tavily API レスポンスと一致すること** をここで担保します。
 
 これらの型は推測やドキュメントではなく、[`../experiments/`](../experiments/README.md) の実測で確定したものです。型を再確認・更新する手順はそちらを参照してください。
 
@@ -64,5 +64,5 @@ API が安定しているため頻繁な更新は不要ですが、レスポン�
 ## 型を変えたくなったら
 
 1. まず [`../experiments/`](../experiments/README.md) のプローブで実体を観測する。
-2. 観測に合わせて `../src/tavily_common.py` の `TypedDict` を更新する。
+2. 観測に合わせて `../src/tav_core/tavily_types.py` の `TypedDict` を更新する。
 3. `capture_fixtures.py` で `fixtures/` を更新し、本テストで一致を確認する。

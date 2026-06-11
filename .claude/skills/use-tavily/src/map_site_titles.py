@@ -23,17 +23,17 @@ from urllib.parse import urlparse
 
 from tavily.errors import InvalidAPIKeyError
 
-from tavily_common import (
+from tav_core import (
     TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,
     RunOutcome,
     build_response_payload,
+    collect_titles,
     create_tavily_client,
     dedupe_preserve_order,
     finalize,
 )
-from title_fetch import collect_titles
 
 
 DETAIL_PRESETS: dict[str, dict[str, Any]] = {
@@ -85,8 +85,8 @@ DEFAULT_DETAIL = "balanced"
 DEFAULT_ALLOW_EXTERNAL = False
 
 # Title fetching (TitleParser / fetch_page_title / build_title_from_url /
-# collect_titles / PageTitleResult) now lives in ``title_fetch.py`` so both this
-# script and ``tavily_common``'s split-layout title back-fill share one
+# collect_titles / PageTitleResult) lives in ``tav_core/page_title.py`` so both
+# this script and ``tav_core``'s split-layout title back-fill share one
 # implementation. The ``DETAIL_PRESETS["titles"]`` budget below is still applied
 # here via ``collect_titles``.
 

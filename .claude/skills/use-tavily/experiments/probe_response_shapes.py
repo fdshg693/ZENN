@@ -29,7 +29,7 @@ from crawl_site_content import resolve_crawl_options, run_crawl_request  # noqa:
 from extract_url_content import resolve_extract_options, run_extract_request  # noqa: E402
 from map_site_titles import resolve_map_options, run_map_request  # noqa: E402
 from search_topic import resolve_search_options, run_search_request  # noqa: E402
-from tavily_common import create_tavily_client  # noqa: E402
+from tav_core import create_tavily_client  # noqa: E402
 
 
 def type_name(value: Any) -> str:

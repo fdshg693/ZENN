@@ -2,7 +2,7 @@
 
 このディレクトリは、Tavily API が **実際に返す結果オブジェクトの型** を観測して確定させるための実験用スクリプト群(使い捨ての実験ノート)です。
 
-背景: ラッパースクリプトの戻り値はかつて「ただの `dict`」という緩い扱いでした。API がある程度安定していることを踏まえ、ここで実レスポンスを観測し、ドキュメントではなく **実体** から型を確定させました。確定した型は [`../src/tavily_common.py`](../src/tavily_common.py) の `TypedDict` に、その型の検証は [`../tests/`](../tests/README.md) にあります。
+背景: ラッパースクリプトの戻り値はかつて「ただの `dict`」という緩い扱いでした。API がある程度安定していることを踏まえ、ここで実レスポンスを観測し、ドキュメントではなく **実体** から型を確定させました。確定した型は [`../src/tav_core/tavily_types.py`](../src/tav_core/tavily_types.py) の `TypedDict` に、その型の検証は [`../tests/`](../tests/README.md) にあります。
 
 > **方針**: 公開ドキュメントの表ではなく、ライブ API の実レスポンスを正本とする。実際、ドキュメントと実体が食い違う箇所が複数見つかりました(下記)。
 
@@ -53,5 +53,5 @@ python .claude/skills/use-tavily/experiments/capture_fixtures.py
 ## 型を変えたくなったら
 
 1. ここのプローブで実体を観測する。
-2. 観測に合わせて [`../src/tavily_common.py`](../src/tavily_common.py) の `TypedDict` を更新する。
+2. 観測に合わせて [`../src/tav_core/tavily_types.py`](../src/tav_core/tavily_types.py) の `TypedDict` を更新する。
 3. `capture_fixtures.py` で fixtures を更新し、[`../tests/`](../tests/README.md) のテストで一致を確認する。

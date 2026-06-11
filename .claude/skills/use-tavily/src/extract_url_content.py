@@ -21,7 +21,7 @@ from typing import Any, Mapping
 
 from tavily.errors import InvalidAPIKeyError
 
-from tavily_common import (
+from tav_core import (
     TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,

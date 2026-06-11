@@ -20,7 +20,7 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(SRC))
 
 from extract_url_content import resolve_extract_options, run_extract_request  # noqa: E402
-from tavily_common import create_tavily_client  # noqa: E402
+from tav_core import create_tavily_client  # noqa: E402
 
 
 def type_name(value: Any) -> str:

@@ -1,7 +1,8 @@
 r"""Offline tests for the role-based ``--topic`` output layout (no network, no credits).
 
-These cover the PLAN.md migration in ``tavily_common.py`` / ``title_fetch.py`` —
-output is filed by the *role* of its ``result_kind`` so kinds never mix:
+These cover the role-based output layout in ``tav_core`` (``topic_layout`` /
+``page_title``) — output is filed by the *role* of its ``result_kind`` so kinds
+never mix:
 
   * helpers: ``role_for`` / ``slugify`` / ``next_sequence`` / ``render_page_markdown`` /
     ``slim_result_item`` / ``should_write_log`` / ``should_show_log_path`` /
@@ -41,11 +42,13 @@ TESTS_DIR = Path(__file__).resolve().parent
 SRC = TESTS_DIR.parent / "src"
 sys.path.insert(0, str(SRC))
 
-import tavily_common as tc  # noqa: E402
-from tavily_common import (  # noqa: E402
+import tav_core as tc  # noqa: E402
+from tav_core import (  # noqa: E402
     ExitCode,
+    PageTitleResult,
     ResultKind,
     TopicArtifact,
+    build_title_from_url,
     emit_payload,
     next_sequence,
     render_page_markdown,
@@ -56,7 +59,6 @@ from tavily_common import (  # noqa: E402
     slim_result_item,
     slugify,
 )
-from title_fetch import PageTitleResult, build_title_from_url  # noqa: E402
 
 
 def make_log(script: str) -> dict:
@@ -250,8 +252,8 @@ class TestLayoutWriters(EnvGuard):
     # -- content split + markdown -----------------------------------------
     def test_content_writes_md_per_page_plus_index(self) -> None:
         # Crawl items carry no title; stub the fetch so the suite stays offline.
-        original = tc.fetch_page_title
-        tc.fetch_page_title = stub_title
+        original = tc.topic_layout.fetch_page_title
+        tc.topic_layout.fetch_page_title = stub_title
         try:
             results = [
                 {"url": "https://x/1", "raw_content": "one"},
@@ -265,7 +267,7 @@ class TestLayoutWriters(EnvGuard):
                 exit_code=ExitCode.SUCCESS,
             )
         finally:
-            tc.fetch_page_title = original
+            tc.topic_layout.fetch_page_title = original
 
         pages = self.base / "topic_c" / "pages"
         md_files = sorted(p.name for p in pages.glob("*.md"))
@@ -284,8 +286,8 @@ class TestLayoutWriters(EnvGuard):
         def must_not_call(url, *, timeout_seconds, max_bytes):  # pragma: no cover
             raise AssertionError("fetch_page_title must not be called when titles exist")
 
-        original = tc.fetch_page_title
-        tc.fetch_page_title = must_not_call
+        original = tc.topic_layout.fetch_page_title
+        tc.topic_layout.fetch_page_title = must_not_call
         try:
             self._emit(
                 payload=make_log("extract_url_content.py"),
@@ -295,7 +297,7 @@ class TestLayoutWriters(EnvGuard):
                 exit_code=ExitCode.SUCCESS,
             )
         finally:
-            tc.fetch_page_title = original
+            tc.topic_layout.fetch_page_title = original
 
         index = read_json(self.base / "topic_e" / "pages" / "index.json")
         entry = index["entries"][0]
@@ -314,8 +316,8 @@ class TestLayoutWriters(EnvGuard):
                 status_code=None, error="boom",
             )
 
-        original = tc.fetch_page_title
-        tc.fetch_page_title = failing
+        original = tc.topic_layout.fetch_page_title
+        tc.topic_layout.fetch_page_title = failing
         try:
             self._emit(
                 payload=make_log("crawl_site_content.py"),
@@ -325,7 +327,7 @@ class TestLayoutWriters(EnvGuard):
                 exit_code=ExitCode.SUCCESS,
             )
         finally:
-            tc.fetch_page_title = original
+            tc.topic_layout.fetch_page_title = original
 
         entry = read_json(self.base / "topic_fb" / "pages" / "index.json")["entries"][0]
         self.assertEqual(entry["title_source"], "url_fallback")
@@ -346,8 +348,8 @@ class TestLayoutWriters(EnvGuard):
         self.assertEqual(files, ["0001-first-query.json", "0002-second-query.json"])
 
     def test_content_appends_and_keeps_duplicates(self) -> None:
-        original = tc.fetch_page_title
-        tc.fetch_page_title = stub_title
+        original = tc.topic_layout.fetch_page_title
+        tc.topic_layout.fetch_page_title = stub_title
         try:
             for _ in range(2):  # same URL extracted twice
                 self._emit(
@@ -358,7 +360,7 @@ class TestLayoutWriters(EnvGuard):
                     exit_code=ExitCode.SUCCESS,
                 )
         finally:
-            tc.fetch_page_title = original
+            tc.topic_layout.fetch_page_title = original
 
         pages = self.base / "topic_dup" / "pages"
         md_files = sorted(p.name for p in pages.glob("*.md"))
@@ -371,8 +373,8 @@ class TestLayoutWriters(EnvGuard):
 
     # -- composite: discovery + content both kept -------------------------
     def test_composite_keeps_both_search_menu_and_pages(self) -> None:
-        original = tc.fetch_page_title
-        tc.fetch_page_title = stub_title
+        original = tc.topic_layout.fetch_page_title
+        tc.topic_layout.fetch_page_title = stub_title
         try:
             self._emit(
                 payload=make_log("search_extract_topic.py"),
@@ -387,7 +389,7 @@ class TestLayoutWriters(EnvGuard):
                 ),
             )
         finally:
-            tc.fetch_page_title = original
+            tc.topic_layout.fetch_page_title = original
 
         # Discovery half -> search/, content half -> pages/.
         self.assertTrue((self.base / "topic_se" / "search" / "0001-my-query.json").exists())
@@ -457,11 +459,11 @@ class TestPathNoticeToggle(EnvGuard):
         os.environ["TAVILY_OUTPUT_DIR"] = str(self.base)
         # A log must be written for the log-path notice to be in play.
         os.environ["TAVILY_WRITE_LOG"] = "true"
-        self._orig_log_dir = tc.LOG_DIRECTORY
-        tc.LOG_DIRECTORY = self.base / "logs"
+        self._orig_log_dir = tc.output.LOG_DIRECTORY
+        tc.output.LOG_DIRECTORY = self.base / "logs"
 
     def tearDown(self) -> None:
-        tc.LOG_DIRECTORY = self._orig_log_dir
+        tc.output.LOG_DIRECTORY = self._orig_log_dir
         self._tmp.cleanup()
         super().tearDown()
 
@@ -500,11 +502,11 @@ class TestLogToggle(EnvGuard):
         self._tmp = TemporaryDirectory()
         self.base = Path(self._tmp.name)
         os.environ["TAVILY_OUTPUT_DIR"] = str(self.base)
-        self._orig_log_dir = tc.LOG_DIRECTORY
-        tc.LOG_DIRECTORY = self.base / "logs"
+        self._orig_log_dir = tc.output.LOG_DIRECTORY
+        tc.output.LOG_DIRECTORY = self.base / "logs"
 
     def tearDown(self) -> None:
-        tc.LOG_DIRECTORY = self._orig_log_dir
+        tc.output.LOG_DIRECTORY = self._orig_log_dir
         self._tmp.cleanup()
         super().tearDown()
 

@@ -1,5 +1,5 @@
 ---
-# Version 3.1.0
+# Version 3.2.0
 name: use-tavily
 description: Skill to understand how to utilize Tavily to achieve specific goals in this project. **NOT HOW TO USE TAVILY SDK**. For that, see the `tavily-sdk` skill. 
 

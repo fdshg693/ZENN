@@ -22,7 +22,7 @@ import importlib
 import sys
 from collections.abc import Sequence
 
-from tavily_common import ExitCode, finalize
+from tav_core import ExitCode, finalize
 
 
 # subcommand -> (wrapper module name, role tag, one-line summary). The module

@@ -16,7 +16,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zenn-use-tavily"
-version = "3.1.0"
+version = "3.2.0"
 description = "Thin CLI wrappers around Tavily for the ZENN article-writing skill"
 requires-python = ">=3.11"
 dependencies = [
@@ -29,9 +29,12 @@ tav = "tav_cli:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
+# Shared implementation lives in the ``tav_core`` package; the command wrappers
+# stay as top-level modules so direct ``python src/<name>.py`` runs and the
+# ``importlib.import_module`` dispatch in ``tav_cli`` keep working unchanged.
+packages = ["tav_core"]
 py-modules = [
     "tav_cli",
-    "tavily_common",
     "search_topic",
     "search_extract_topic",
     "research_topic",

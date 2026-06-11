@@ -24,9 +24,9 @@ Tavily の検索 / 抽出 / クロール / マップ / リサーチを、**プ�
 
 - **判断軸つき一枚スキル**: API ごとにスキルを分けず、`SKILL.md` の冒頭に「URL が分かっているか / サイトが分かっているか / キーワードだけか」という判断フローを置いている
 - **詳細度プリセット**: 各スクリプトの先頭に `DETAIL_PRESETS = {"quick": ..., "balanced": ..., "max": ...}` を持ち、Tavily の `search_depth` / `max_results` / `chunks_per_source` などはここで集中管理
-- **共通モジュール化**: `.env` 読み込み・Tavily クライアント生成・JSON ペイロード整形を `src/tavily_common.py` に集約
+- **共通モジュール化**: `.env` 読み込み・Tavily クライアント生成・JSON ペイロード整形・戻り値契約を `src/tav_core/` パッケージに責務ごとに分割して集約(旧 `tavily_common.py` を `result_contract` / `environment` / `output` / `topic_layout` などへ分割)
 - **`--topic` トピックレイアウト**: 出力先はフルパスでなく `--topic <name>` で指定し、`<TAVILY_OUTPUT_DIR>/<topic>/`(既定 `temp/web/<topic>/`)配下に集約(`search.json`/`map.json`)・分割(`0001.json`… + `index.json`)・単一(`research.json`)の 3 系統で書き出す(`--topic` 省略時は stdout に単一 `ResultEnvelope`)
-- **戻り値の契約**: 全スクリプトが同一形状の自己記述エンベロープ(`result_kind` + `result` + `exit_code`)を出力し、終了コードは `ExitCode`(`IntEnum`)で共通化。`src/tavily_common.py` の列挙/`TypedDict` が正本で、詳細は [src/README.md](src/README.md) の「実行結果の戻り値(契約)」を参照
+- **戻り値の契約**: 全スクリプトが同一形状の自己記述エンベロープ(`result_kind` + `result` + `exit_code`)を出力し、終了コードは `ExitCode`(`IntEnum`)で共通化。`src/tav_core/result_contract.py` の列挙/`TypedDict` が正本で、詳細は [src/README.md](src/README.md) の「実行結果の戻り値(契約)」を参照
 - **bash / PowerShell 両対応の実行例**: 各スクリプトの docstring 冒頭に最小コマンド例を載せている
 
 ## ドキュメント構成
@@ -47,8 +47,12 @@ Tavily の検索 / 抽出 / クロール / マップ / リサーチを、**プ�
 ├── SKILL.md             ← AI に読ませるスキル本体(判断フロー / 引数例 / 命名規約)
 └── src/
     ├── README.md              ← Python コードの説明(使い方 / カスタマイズ)
-    ├── tavily_common.py       ← .env 読込、Tavily クライアント生成、JSON 整形、出力レイアウト分岐・title 補完
-    ├── title_fetch.py         ← HTML 直 Fetch でページタイトル取得(map_site_titles と分割系 title 補完が共有)
+    ├── tav_core/              ← 共通実装パッケージ(.env 読込・クライアント生成・JSON 整形・戻り値契約・出力レイアウト・title 補完)
+    │   ├── result_contract.py / tavily_types.py   ← 戻り値契約の型・列挙 / Tavily レスポンス要素型
+    │   ├── environment.py / output.py             ← .env・クライアント・環境トグル / 出力シンク emit()
+    │   ├── topic_layout.py / run_shell.py         ← 役割別出力ライタ(何をどこへ)/ 命令的シェル finalize()・spawn
+    │   ├── projection.py                          ← 結果アイテムの投影(調査に要る列だけ残す)
+    │   └── page_title.py / text_utils.py          ← HTML タイトル取得 / slugify・dedupe
     ├── search_topic.py        ← キーワード検索の最小ラッパー
     ├── search_extract_topic.py ← search → extract の合成
     ├── research_topic.py      ← Research API ラッパー
@@ -56,6 +60,7 @@ Tavily の検索 / 抽出 / クロール / マップ / リサーチを、**プ�
     ├── map_site_titles.py     ← サイトの URL 一覧 + タイトル
     ├── map_extract_site_content.py ← map → extract の合成
     ├── crawl_site_content.py  ← サイトクロール + 本文回収
+    ├── tav_cli.py             ← サブコマンドを各ラッパーへ振り分けるディスパッチャ(`tav` の実体)
     └── logs/                  ← 各実行のリクエスト/レスポンス JSON
 ```
 

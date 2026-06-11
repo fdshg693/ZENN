@@ -24,7 +24,7 @@ from tavily.errors import InvalidAPIKeyError
 
 from extract_url_content import run_extract_request
 from search_topic import run_search_request
-from tavily_common import (
+from tav_core import (
     TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,

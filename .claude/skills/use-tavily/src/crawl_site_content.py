@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 
 from tavily.errors import InvalidAPIKeyError
 
-from tavily_common import (
+from tav_core import (
     TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,

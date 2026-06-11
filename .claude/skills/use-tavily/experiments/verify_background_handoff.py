@@ -23,7 +23,7 @@ SRC = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(SRC))
 
 import research_topic  # noqa: E402
-from tavily_common import ExitCode, finalize  # noqa: E402
+from tav_core import ExitCode, finalize  # noqa: E402
 
 TOPIC = "_bg_handoff_test"
 

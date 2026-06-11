@@ -1,6 +1,6 @@
 r"""Confirm the decided Tavily result TypedDicts match REAL API responses.
 
-The authoritative types live in ``src/tavily_common.py`` (``SearchResultItem``,
+The authoritative types live in ``src/tav_core/tavily_types.py`` (``SearchResultItem``,
 ``ExtractResultItem``, ``CrawlResultItem``, ``SitePageItem``, ``ResearchSource``,
 ``CompletedResearchResponse``, ``ExtractFailedItem``). This module proves those
 types against real, captured responses in ``fixtures/`` so a drift in the API or
@@ -34,7 +34,7 @@ FIXTURES = TESTS_DIR / "fixtures"
 SRC = TESTS_DIR.parent / "src"
 sys.path.insert(0, str(SRC))
 
-from tavily_common import (  # noqa: E402
+from tav_core import (  # noqa: E402
     CompletedResearchResponse,
     CrawlResultItem,
     ExtractFailedItem,
@@ -242,7 +242,7 @@ class TestProjection(unittest.TestCase):
 class TestLiveShapes(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        from tavily_common import create_tavily_client
+        from tav_core import create_tavily_client
 
         cls.client, _ = create_tavily_client()
 

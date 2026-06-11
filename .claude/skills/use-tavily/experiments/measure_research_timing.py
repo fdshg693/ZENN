@@ -34,7 +34,7 @@ from typing import Any
 SRC = Path(__file__).resolve().parent.parent / "src"
 sys.path.insert(0, str(SRC))
 
-from tavily_common import create_tavily_client  # noqa: E402
+from tav_core import create_tavily_client  # noqa: E402
 
 TERMINAL = {"completed", "failed", "cancelled"}
 RESULT_PATH = Path(__file__).resolve().parent / "measure_research_timing_result.json"

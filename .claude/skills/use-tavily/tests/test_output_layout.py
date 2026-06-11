@@ -4,7 +4,7 @@ These cover the PLAN.md migration in ``tavily_common.py`` / ``title_fetch.py`` �
 output is filed by the *role* of its ``result_kind`` so kinds never mix:
 
   * helpers: ``role_for`` / ``slugify`` / ``next_sequence`` / ``render_page_markdown`` /
-    ``slim_result_item`` / ``should_write_log`` / ``should_show_output_paths`` /
+    ``slim_result_item`` / ``should_write_log`` / ``should_show_log_path`` /
     ``resolve_output_target``.
   * role separation: search -> ``search/``, map -> ``map/``, extract/crawl ->
     ``pages/``, research -> ``research/`` — never mixed in one series.
@@ -17,8 +17,8 @@ output is filed by the *role* of its ``result_kind`` so kinds never mix:
   * projection: search rows drop ``raw_content``; extract pages carry no images;
     the audit log keeps the raw fields.
   * report: research success -> one ``.md``; failure -> one ``.json``.
-  * path-notice toggle: ``TAVILY_SHOW_OUTPUT_PATHS=false`` silences "Wrote …"
-    lines but still writes the files.
+  * log-path-notice toggle: ``TAVILY_SHOW_LOG_PATH=false`` silences the
+    "Wrote full log …" line but result-file path notices are always shown.
   * log toggle: ``TAVILY_WRITE_LOG=false`` writes no ``logs/<script>-log.json``.
   * stdout contract: no ``--topic`` -> a single (projected) ``ResultEnvelope``.
 
@@ -51,7 +51,7 @@ from tavily_common import (  # noqa: E402
     render_page_markdown,
     resolve_output_target,
     role_for,
-    should_show_output_paths,
+    should_show_log_path,
     should_write_log,
     slim_result_item,
     slugify,
@@ -84,7 +84,7 @@ def stub_title(url, *, timeout_seconds, max_bytes):
 class EnvGuard(unittest.TestCase):
     """Snapshot/restore the env vars these tests mutate."""
 
-    _KEYS = ("TAVILY_OUTPUT_DIR", "TAVILY_WRITE_LOG", "TAVILY_SHOW_OUTPUT_PATHS")
+    _KEYS = ("TAVILY_OUTPUT_DIR", "TAVILY_WRITE_LOG", "TAVILY_SHOW_LOG_PATH")
 
     def setUp(self) -> None:
         self._saved = {k: os.environ.get(k) for k in self._KEYS}
@@ -180,14 +180,14 @@ class TestHelpers(EnvGuard):
             os.environ["TAVILY_WRITE_LOG"] = value
             self.assertTrue(should_write_log(), f"{value!r} should enable the log")
 
-    def test_should_show_output_paths_default_true(self) -> None:
-        os.environ.pop("TAVILY_SHOW_OUTPUT_PATHS", None)
-        self.assertTrue(should_show_output_paths())
+    def test_should_show_log_path_default_true(self) -> None:
+        os.environ.pop("TAVILY_SHOW_LOG_PATH", None)
+        self.assertTrue(should_show_log_path())
 
-    def test_should_show_output_paths_falsey(self) -> None:
+    def test_should_show_log_path_falsey(self) -> None:
         for value in ("false", "0", "no", "off", ""):
-            os.environ["TAVILY_SHOW_OUTPUT_PATHS"] = value
-            self.assertFalse(should_show_output_paths(), f"{value!r} should silence path notices")
+            os.environ["TAVILY_SHOW_LOG_PATH"] = value
+            self.assertFalse(should_show_log_path(), f"{value!r} should silence the log-path notice")
 
 
 class TestLayoutWriters(EnvGuard):
@@ -408,7 +408,10 @@ class TestLayoutWriters(EnvGuard):
         self.assertTrue(f.exists())
         self.assertEqual(f.read_text(encoding="utf-8"), "# Report\n\nbody\n")
 
-    def test_research_failure_writes_json(self) -> None:
+    def test_research_failure_writes_no_file(self) -> None:
+        # "Report or nothing": a non-success outcome writes NO file into research/
+        # (the audit log is the sole record; a foreground timeout is finished by a
+        # detached poller instead). Earlier behavior wrote a .json failure stub.
         self._emit(
             payload=make_log("research_topic.py"),
             topic="topic_rf",
@@ -417,9 +420,22 @@ class TestLayoutWriters(EnvGuard):
             exit_code=ExitCode.RUNTIME_ERROR,
             slug="bad question",
         )
-        f = self.base / "topic_rf" / "research" / "0001-bad-question.json"
-        self.assertTrue(f.exists())
-        self.assertEqual(read_json(f)["result"]["status"], "failed")
+        research_dir = self.base / "topic_rf" / "research"
+        self.assertFalse((research_dir / "0001-bad-question.json").exists())
+        self.assertEqual(list(research_dir.glob("*")) if research_dir.exists() else [], [])
+
+    def test_research_incomplete_writes_no_file(self) -> None:
+        # A foreground timeout (INCOMPLETE) likewise leaves research/ empty.
+        self._emit(
+            payload=make_log("research_topic.py"),
+            topic="topic_ri",
+            result_kind=ResultKind.RESEARCH_REPORT,
+            result={"status": "in_progress"},
+            exit_code=ExitCode.INCOMPLETE,
+            slug="slow question",
+        )
+        research_dir = self.base / "topic_ri" / "research"
+        self.assertEqual(list(research_dir.glob("*")) if research_dir.exists() else [], [])
 
     def test_empty_content_still_writes_index(self) -> None:
         self._emit(
@@ -439,9 +455,13 @@ class TestPathNoticeToggle(EnvGuard):
         self._tmp = TemporaryDirectory()
         self.base = Path(self._tmp.name)
         os.environ["TAVILY_OUTPUT_DIR"] = str(self.base)
-        os.environ["TAVILY_WRITE_LOG"] = "false"
+        # A log must be written for the log-path notice to be in play.
+        os.environ["TAVILY_WRITE_LOG"] = "true"
+        self._orig_log_dir = tc.LOG_DIRECTORY
+        tc.LOG_DIRECTORY = self.base / "logs"
 
     def tearDown(self) -> None:
+        tc.LOG_DIRECTORY = self._orig_log_dir
         self._tmp.cleanup()
         super().tearDown()
 
@@ -458,16 +478,20 @@ class TestPathNoticeToggle(EnvGuard):
             )
         return buffer.getvalue()
 
-    def test_paths_silenced_but_file_written(self) -> None:
-        os.environ["TAVILY_SHOW_OUTPUT_PATHS"] = "false"
+    def test_log_path_silenced_but_result_path_still_shown(self) -> None:
+        os.environ["TAVILY_SHOW_LOG_PATH"] = "false"
         stderr = self._emit_capture_stderr()
-        self.assertNotIn("Wrote", stderr)
+        # The log-path notice is silenced ...
+        self.assertNotIn("Wrote full log", stderr)
+        # ... but the result-file path notice is always shown, and files exist.
+        self.assertIn("Wrote 1 search_results row(s)", stderr)
         self.assertTrue((self.base / "t" / "search" / "0001-q.json").exists())
 
-    def test_paths_shown_by_default(self) -> None:
-        os.environ.pop("TAVILY_SHOW_OUTPUT_PATHS", None)
+    def test_log_path_shown_by_default(self) -> None:
+        os.environ.pop("TAVILY_SHOW_LOG_PATH", None)
         stderr = self._emit_capture_stderr()
-        self.assertIn("Wrote", stderr)
+        self.assertIn("Wrote full log", stderr)
+        self.assertIn("Wrote 1 search_results row(s)", stderr)
 
 
 class TestLogToggle(EnvGuard):

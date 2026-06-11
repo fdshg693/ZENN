@@ -58,7 +58,7 @@ LOG_DIRECTORY = Path(__file__).resolve().parent / "logs"
 # Output-layout settings, read from the environment (see README "設定とパス解決").
 OUTPUT_DIR_ENV = "TAVILY_OUTPUT_DIR"
 WRITE_LOG_ENV = "TAVILY_WRITE_LOG"
-SHOW_OUTPUT_PATHS_ENV = "TAVILY_SHOW_OUTPUT_PATHS"
+SHOW_LOG_PATH_ENV = "TAVILY_SHOW_LOG_PATH"
 DEFAULT_OUTPUT_DIR = "temp/web"
 INDEX_FILE_NAME = "index.json"
 
@@ -362,6 +362,25 @@ class TopicArtifact:
 
 
 @dataclass(slots=True)
+class BackgroundTask:
+    """A fully detached follow-on process a run wants launched after it returns.
+
+    The wrapper scripts block their caller (often an AI agent) only briefly. A
+    long-running op — today only ``research`` — whose foreground wait expires
+    returns ``INCOMPLETE`` immediately AND attaches one of these so the work is
+    not abandoned: ``finalize()`` (the sole side-effect site) spawns ``argv`` as a
+    detached process that outlives this one and finishes the job. ``main()`` stays
+    pure by merely *describing* the process to launch; nothing is spawned until
+    ``finalize()`` runs. ``argv`` is the complete command (interpreter + script +
+    args); ``cwd`` fixes the working directory so output-dir resolution matches
+    the parent (see ``get_output_dir``).
+    """
+
+    argv: list[str]
+    cwd: str | None = None
+
+
+@dataclass(slots=True)
 class RunOutcome:
     """The complete, side-effect-free return value of a script's ``main()``.
 
@@ -386,6 +405,9 @@ class RunOutcome:
       stdout path so the pipe contract stays one envelope.
     - ``message``: a single stderr line to print, if any (errors, empty/incomplete
       notices). ``None`` means stay silent on stderr.
+    - ``background``: an optional ``BackgroundTask`` ``finalize()`` spawns detached
+      after emitting this run's output. Used by ``research`` to keep polling a job
+      whose foreground wait expired. ``None`` means no follow-on process.
     """
 
     exit_code: ExitCode
@@ -396,6 +418,7 @@ class RunOutcome:
     message: str | None = None
     slug: str | None = None
     discovery: TopicArtifact | None = None
+    background: BackgroundTask | None = None
 
 
 def finalize(outcome: RunOutcome) -> ExitCode:
@@ -418,7 +441,41 @@ def finalize(outcome: RunOutcome) -> ExitCode:
         )
     if outcome.message:
         emit(OutputChannel.DIAGNOSTIC, outcome.message)
+    if outcome.background is not None:
+        spawn_detached(outcome.background)
     return outcome.exit_code
+
+
+def spawn_detached(task: BackgroundTask) -> None:
+    """Launch ``task.argv`` as a process that fully outlives this one.
+
+    The child must survive the parent exiting and must not hold the parent's
+    console (the parent typically returns control to an interactive caller right
+    after). On Windows that means ``DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP``;
+    on POSIX a new session (``start_new_session``). The child's std streams are
+    detached: it talks to no one — it persists its result to the topic folder and
+    its outcome to the audit log. A spawn failure is swallowed to a stderr
+    ``DIAGNOSTIC`` so it can never turn a returned ``INCOMPLETE`` into a crash.
+    """
+    import subprocess
+
+    kwargs: dict[str, Any] = {
+        "cwd": task.cwd,
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "close_fds": True,
+    }
+    if os.name == "nt":
+        DETACHED_PROCESS = 0x00000008
+        CREATE_NEW_PROCESS_GROUP = 0x00000200
+        kwargs["creationflags"] = DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
+    else:
+        kwargs["start_new_session"] = True
+    try:
+        subprocess.Popen(task.argv, **kwargs)  # noqa: S603 — argv is built internally, not from user shell input
+    except OSError as exc:
+        emit(OutputChannel.DIAGNOSTIC, f"Could not spawn background poller: {exc}")
 
 
 def load_environment() -> str | None:
@@ -479,15 +536,16 @@ def should_write_log() -> bool:
     return _env_flag(WRITE_LOG_ENV)
 
 
-def should_show_output_paths() -> bool:
-    """Whether to echo "Wrote ... to <path>" notices, from ``TAVILY_SHOW_OUTPUT_PATHS``.
+def should_show_log_path() -> bool:
+    """Whether to echo the "Wrote full log to <path>" notice, from ``TAVILY_SHOW_LOG_PATH``.
 
     Default (unset) is ``True``. Same falsey convention as ``should_write_log()``.
-    This toggles ONLY the stderr ``DIAGNOSTIC`` path notices (audit log + each
-    role writer); error / empty / incomplete ``message`` lines and the files
-    themselves are unaffected.
+    This toggles ONLY the stderr ``DIAGNOSTIC`` notice for the *audit log* path,
+    and only when an audit log is actually written (``should_write_log()``).
+    Result/output file path notices are always shown — they point to the records
+    the caller asked for — and the files themselves are unaffected.
     """
-    return _env_flag(SHOW_OUTPUT_PATHS_ENV)
+    return _env_flag(SHOW_LOG_PATH_ENV)
 
 
 def resolve_output_target(topic: str, *, output_dir: Path | None = None) -> Path:
@@ -700,15 +758,16 @@ def emit_payload(
       ``discovery`` artifact, when present, is filed alongside in its own role
       subfolder so a composite run keeps both its menu and its fetched bodies.
 
-    Every accompanying notice is a ``DIAGNOSTIC`` on stderr, gated by
-    ``should_show_output_paths()``.
+    Every accompanying notice is a ``DIAGNOSTIC`` on stderr. Result/output file
+    path notices are always shown; only the audit-log path notice is gated by
+    ``should_show_log_path()``.
     """
     script_name = payload.get("script", "payload")
 
     if should_write_log():
         log_path = build_log_output_path(script_name=script_name)
         emit(OutputChannel.AUDIT_LOG, payload, path=log_path, pretty=pretty)
-        if should_show_output_paths():
+        if should_show_log_path():
             emit(OutputChannel.DIAGNOSTIC, f"Wrote full log to {log_path}")
 
     if topic is None:
@@ -824,8 +883,7 @@ def write_discovery_list(
     )
     file_path = role_dir / file_name
     emit(OutputChannel.RESULT_FILE, envelope, path=file_path, pretty=pretty)
-    if should_show_output_paths():
-        emit(OutputChannel.DIAGNOSTIC, f"Wrote {len(items)} {result_kind.value} row(s) to {file_path}")
+    emit(OutputChannel.DIAGNOSTIC, f"Wrote {len(items)} {result_kind.value} row(s) to {file_path}")
 
 
 def write_report(
@@ -838,29 +896,29 @@ def write_report(
     exit_code: ExitCode,
     pretty: bool = True,
 ) -> None:
-    """Report role: append one ``NNNN-<slug>`` research report.
+    """Report role: write one ``NNNN-<slug>.md`` report ONLY on success.
 
-    Success (a Markdown ``str``) is written as ``.md`` so it reads straight
-    through; any non-success terminal (the raw final dict) is preserved as ``.json``
-    inside a ``ResultEnvelope`` for cause tracing.
+    A successful run (a Markdown ``str``) is written as ``.md`` so it reads
+    straight through. Any non-success outcome — the foreground wait expiring
+    (``INCOMPLETE``) or a failed/cancelled terminal (``RUNTIME_ERROR``) — writes
+    NO file: research output is "the report or nothing", so a timed-out/failed
+    run must not leave a half-baked ``.json`` artifact in ``research/``. The
+    failure is still fully recorded in the audit log (``logs/<script>-log.json``),
+    and for a foreground timeout a detached poller (``research_background_poll.py``)
+    keeps going and writes the real ``.md`` here if the job later completes.
     """
-    sequence = next_sequence(research_dir)
-    base = f"{sequence:04d}-{slugify(slug)}"
     if exit_code == ExitCode.SUCCESS and isinstance(result, str):
-        file_path = research_dir / f"{base}.md"
+        sequence = next_sequence(research_dir)
+        file_path = research_dir / f"{sequence:04d}-{slugify(slug)}.md"
         markdown = result if result.endswith("\n") else result + "\n"
         emit(OutputChannel.RESULT_FILE, markdown, path=file_path, pretty=pretty)
-    else:
-        file_path = research_dir / f"{base}.json"
-        envelope = build_result_envelope(
-            script_name=script_name,
-            result_kind=result_kind,
-            result=result,
-            exit_code=exit_code,
-        )
-        emit(OutputChannel.RESULT_FILE, envelope, path=file_path, pretty=pretty)
-    if should_show_output_paths():
         emit(OutputChannel.DIAGNOSTIC, f"Wrote research report to {file_path}")
+        return
+    emit(
+        OutputChannel.DIAGNOSTIC,
+        "Research produced no report (non-success outcome); wrote no file. "
+        "See the audit log for the failure detail.",
+    )
 
 
 def ensure_item_titles(items: Sequence[dict[str, Any]]) -> list[tuple[str, str]]:
@@ -964,11 +1022,10 @@ def write_content_pages(
 
     index_path = pages_dir / INDEX_FILE_NAME
     emit(OutputChannel.RESULT_FILE, index, path=index_path, pretty=pretty)
-    if should_show_output_paths():
-        emit(
-            OutputChannel.DIAGNOSTIC,
-            f"Wrote {written} page .md file(s); index now has {len(index['entries'])} entr(ies) at {index_path}",
-        )
+    emit(
+        OutputChannel.DIAGNOSTIC,
+        f"Wrote {written} page .md file(s); index now has {len(index['entries'])} entr(ies) at {index_path}",
+    )
 
 
 def dedupe_preserve_order(values: Sequence[str]) -> list[str]:

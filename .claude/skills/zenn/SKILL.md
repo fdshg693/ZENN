@@ -1,5 +1,5 @@
 ---
-# Version 3.0.0
+# Version 3.0.1
 name: zenn
 description: ZENN記事を、事前調査→概要提案→ユーザー承認→調査→plan→承認→publish の順で進めるスキル
 disable-model-invocation: false
@@ -22,7 +22,7 @@ user-invocable: true
 
 進行順は必ず次の通りです。
 
-1. 外部調査は use-tavily スキルを使う前提を確認する
+1. 外部調査は `use-tavily` スキルを使う
 2. 軽い事前調査を行う
 3. 概要を提案する
 4. **ユーザー承認を待つ**
@@ -208,7 +208,7 @@ tav research "Azure API Management で Azure OpenAI を公開する設計上の�
 
 サブエージェント指示例:
 
-```markdown
+```
 外部調査には use-tavily スキルを使ってください(一般的な WEB 検索ツールは使わない)。
 
 {keyword1 keyword2 ...} に関する最新の情報を収集してください。

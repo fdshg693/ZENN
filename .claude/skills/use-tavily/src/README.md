@@ -80,9 +80,9 @@ if __name__ == "__main__":
 | `2` | `MISSING_API_KEY` | `TAVILY_API_KEY` が未設定または空 |
 | `3` | `INVALID_API_KEY` | Tavily にキーを拒否された |
 | `4` | `EMPTY_RESULT` | 呼び出しは成功したが後段に渡せるデータが無い(抽出対象 URL が 0 件)。`search_extract` / `map_extract` のみ |
-| `5` | `INCOMPLETE` | 長時間処理(research)が待機時間内に終端状態へ到達しなかった。`research_topic` のみ |
+| `5` | `INCOMPLETE` | 長時間処理(research)が**前景**待機内に終端状態へ到達しなかった。`--topic` 指定時はデタッチした背景ポーラ(`research_background_poll.py`)が続行する。`research_topic` のみ |
 
-`4` / `5` は以前 1 つのコードに混在していたものを分離しています(`research` のタイムアウトは `4` ではなく `5`)。
+`4` / `5` は以前 1 つのコードに混在していたものを分離しています(`research` の前景未完了は `4` ではなく `5`)。`research` の待機は前景 / 背景の二段構成で、終了コードはあくまで前景の結果を表します(背景ポーラの最終結果は `logs/research_background_poll-log.json` に記録)。
 
 ### 2. 出力データ — `ResultEnvelope`(トピックフォルダ配下のファイル / stdout)
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
 |------|------------|--------------|
 | discovery | `search` → `search/` / `map` → `map/` | `NNNN-<slug>.json`(**集約 JSON リスト** 1 ファイル。URL 単位に分割しない=一覧で skim するため)。中身は投影済み `ResultEnvelope`(`result` はリスト)。 |
 | content | `extract` / `crawl` / `search_extract` / `map_extract` | `pages/NNNN-<slug>.md`(**1 ページ = 1 Markdown**: `# <title>` + 本文)+ `pages/index.json`。本文は読むものなので分割 + `.md`。 |
-| report | `research` → `research/` | `NNNN-<slug>.md`(成功は素の Markdown を通読)。失敗時のみ生 dict を `.json`。 |
+| report | `research` → `research/` | `NNNN-<slug>.md`(**成功時のみ**素の Markdown を通読)。失敗/前景未完では**ファイルを書かない**(前景タイムアウトは背景ポーラが完了後に同じ `.md` を書く。終端失敗や背景も尽きた場合は監査ログのみ)。 |
 
 `NNNN` は**サブフォルダごとに独立採番**し、既存をスキャンして `max+1` で**継続(追記)**します(上書きしない)。同じクエリ再実行は `search/` に別ファイル、同じ URL 再 extract は `pages/` に別 `.md` + index に別エントリ(**重複も保持**)。`slug` はクエリ / ドメイン / タイトル由来で、ファイル名だけで中身が分かります。
 
@@ -123,7 +123,7 @@ content 系の `pages/index.json` が唯一の url↔ファイル対応表で、
 }
 ```
 
-後段で読むときは、content 系なら **`pages/index.json` を起点に各 `NNNN-<slug>.md` を辿る**(各 `.md` は `# title` + 本文)。discovery / report はファイル名が自己説明的なので `ls` で足り、そのファイルを直接読みます。`title` は content 系で必ず埋まる(既存タイトル保持 = `existing`、HTML 直 Fetch で補完 = `html`、URL 由来フォールバック = `url_fallback`。Tavily はタイトル取得に使わない)。トピックファイル / stdout に書く `result` は**役割ごとに投影**され調査に無関係な列(`raw_content`==None・空 `images`・取得メタ等)を落とします(生の全フィールドは監査ログに残る)。
+後段で読むときは、content 系なら **`pages/index.json` を起点に各 `NNNN-<slug>.md` を辿る**(各 `.md` は `# title` + 本文)。discovery / report はファイル名が自己説明的なので `ls` で足り、そのファイルを直接読みます(report は成功時のみファイルが存在する。前景タイムアウト直後は空でも、背景ポーラの完了後に現れる場合がある)。`title` は content 系で必ず埋まる(既存タイトル保持 = `existing`、HTML 直 Fetch で補完 = `html`、URL 由来フォールバック = `url_fallback`。Tavily はタイトル取得に使わない)。トピックファイル / stdout に書く `result` は**役割ごとに投影**され調査に無関係な列(`raw_content`==None・空 `images`・取得メタ等)を落とします(生の全フィールドは監査ログに残る)。
 
 `result_kind`(`ResultKind`)と各スクリプトの `result` の中身:
 
@@ -135,7 +135,8 @@ content 系の `pages/index.json` が唯一の url↔ファイル対応表で、
 | `map_site_titles.py` | `site_pages` | `list[SitePageItem]`: ページタイトル記録(`PageTitleResult`) |
 | `map_extract_site_content.py` | `extract_results` | `list[ExtractResultItem]`: extract 結果(URL 0 件なら空配列) |
 | `search_extract_topic.py` | `extract_results` | `list[ExtractResultItem]`: extract 結果(URL 0 件なら空配列) |
-| `research_topic.py` | `research_report` | `str`: レポート本文(markdown)。失敗時のみ最終レスポンス dict 全体 |
+| `research_topic.py` | `research_report` | `str`: レポート本文(markdown)。非成功時は最終レスポンス dict(ファイルには書かれず stdout / 監査ログにのみ現れる) |
+| `research_background_poll.py` | `research_report` | `research_topic` の前景未完了を引き継ぐデタッチ poller。完了すれば同じ `research/NNNN-<slug>.md` を書く(内部用・`tav` サブコマンドではない) |
 
 > 後段で結果を読むときは、トップレベルの `result` を取り出してから中身を処理する。`exit_code` を見れば、ファイル単体でも成功/空/未完了が判別できる。
 >
@@ -157,11 +158,11 @@ content 系の `pages/index.json` が唯一の url↔ファイル対応表で、
 | メンバー | 中身 | 行先 | 構造化 |
 |---------|------|------|--------|
 | `RESULT_STDOUT` | `ResultEnvelope` JSON(投影済み) | stdout(`--topic` 未指定時のみ) | あり |
-| `RESULT_FILE` | discovery `.json`(リスト)/ `pages/index.json` / report の `.md`・失敗 `.json` / content の `.md` | トピックフォルダの役割サブフォルダ配下(`search/` `map/` `pages/` `research/`)。`--topic` 指定時のみ | `.json` は構造化 / `.md` は本文 |
+| `RESULT_FILE` | discovery `.json`(リスト)/ `pages/index.json` / report の `.md`(成功時のみ)/ content の `.md` | トピックフォルダの役割サブフォルダ配下(`search/` `map/` `pages/` `research/`)。`--topic` 指定時のみ | `.json` は構造化 / `.md` は本文 |
 | `AUDIT_LOG` | `ResponseEnvelope` JSON(投影前の生フィールド込み) | `logs/<script>-log.json`(`TAVILY_WRITE_LOG` が有効なときのみ) | あり |
 | `DIAGNOSTIC` | 「Wrote ...」「Research finished ...」等の 1 行 | stderr | なし |
 
-`--topic` 指定時の content 系では、`RESULT_FILE` が per-page の `NNNN-<slug>.md` と `pages/index.json` の両方に使われます(チャンネルは増やさず `emit` の呼び出し回数を増やすだけ。`write_output` が `str` を Markdown、それ以外を JSON として書き分ける)。「Wrote … to <path>」パス通知は `TAVILY_SHOW_OUTPUT_PATHS`(未設定=`true`、`false`/`0`/`no`/`off`/空で抑止)でトグルできます。
+`--topic` 指定時の content 系では、`RESULT_FILE` が per-page の `NNNN-<slug>.md` と `pages/index.json` の両方に使われます(チャンネルは増やさず `emit` の呼び出し回数を増やすだけ。`write_output` が `str` を Markdown、それ以外を JSON として書き分ける)。監査ログのパス通知「Wrote full log to <path>」は `TAVILY_SHOW_LOG_PATH`(未設定=`true`、`false`/`0`/`no`/`off`/空で抑止)でトグルできます(監査ログ書き込み時のみ)。結果ファイルのパス通知は常に表示されます。
 
 規律: **stdout には機械可読な `ResultEnvelope` だけ(または何も出さない)。「Wrote ...」等の通知・エラー・進捗はすべて stderr の `DIAGNOSTIC`。** 後段で結果をパースするときは stdout をそのまま読めばよく、stderr は純粋な診断として扱える。`emit()` 以外の場所で `print` しない(出力点を一箇所に集約する)ことがこの契約を成立させています。
 
@@ -188,7 +189,8 @@ src/
 ├── title_fetch.py               ← HTML を直接 Fetch してページタイトルを取得(map_site_titles と、tavily_common の分割系 title 補完が共有)
 ├── search_topic.py              ← キーワード検索の最小ラッパー
 ├── search_extract_topic.py      ← search → extract の合成
-├── research_topic.py            ← Research API ラッパー
+├── research_topic.py            ← Research API ラッパー(前景待機 + 前景未完了時に背景 poller を起動)
+├── research_background_poll.py  ← 前景未完了の research を引き継ぐデタッチ poller(完了後に research/ へ書く。内部用)
 ├── extract_url_content.py       ← URL 群から本文抽出
 ├── map_site_titles.py           ← サイトの URL 一覧 + タイトル
 ├── map_extract_site_content.py  ← map → extract の合成
@@ -204,10 +206,11 @@ src/
 | デフォルトの詳細度 | 各スクリプトの `DEFAULT_DETAIL` 定数 |
 | `include_answer` / `include_raw_content` などの固定フラグ | 各スクリプト冒頭の定数(`INCLUDE_ANSWER` 等) |
 | タイムアウト | 各スクリプトの `REQUEST_TIMEOUT_SECONDS` |
+| `research` の前景 / 背景待機(`foreground_wait_seconds` / `background_wait_seconds` とポーリング間隔) | `research_topic.py` の `DETAIL_PRESETS`(実測の根拠は `../experiments/measure_research_timing.py`) |
 | `.env` 読み込み挙動・JSON 出力フォーマット | `tavily_common.py` |
 | 出力先ベースディレクトリ(`--topic` の解決先、未設定時 `temp/web`) | `.env` の `TAVILY_OUTPUT_DIR` |
 | 監査ログ `logs/<script>-log.json` を書くか(未設定=`true`、`false`/`0`/`no`/`off`/空で抑止) | `.env` の `TAVILY_WRITE_LOG` |
-| 「Wrote … to <path>」パス通知を出すか(未設定=`true`、falsey で抑止。ファイル書き込みは不変) | `.env` の `TAVILY_SHOW_OUTPUT_PATHS` |
+| 監査ログのパス通知「Wrote full log to <path>」を出すか(未設定=`true`、falsey で抑止。監査ログ書き込み時のみ。結果ファイルのパス通知は常に表示) | `.env` の `TAVILY_SHOW_LOG_PATH` |
 | 出力先と `--topic` レイアウト | [SKILL.md](../SKILL.md) の「出力先と `--topic` レイアウト」セクション |
 | AI に提示する判断フロー / 引数例 | [SKILL.md](../SKILL.md) 本体 |
 

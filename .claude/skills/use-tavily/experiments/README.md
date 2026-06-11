@@ -14,8 +14,12 @@ experiments/
 ├── probe_response_shapes.py   ← search / extract / crawl / map の per-item キーと型を一括観測
 ├── probe_edge_shapes.py       ← failed_results の形 と extract の title 常在性を確認
 ├── probe_research_shape.py    ← research 完了レスポンス(content / sources)の形を観測
+├── measure_research_timing.py ← research の実完了時間を model × 問い複雑度で計測(前景/背景タイムアウトの根拠)
+├── verify_background_handoff.py ← 前景タイムアウト → 背景 poller → research/ への書き込みを E2E 検証
 └── capture_fixtures.py        ← 実レスポンスを ../tests/fixtures/ に保存(テストの入力を再生成)
 ```
+
+`measure_research_timing.py` は複数の research ジョブを**同時に**起動し(各ジョブはサーバ側で走るので総時間は最遅ジョブ程度)、各々の終端到達までの秒数を計測して `measure_research_timing_result.json`(スクラッチ)に逐次書き出します。`research_topic.py` の前景/背景待機(`DETAIL_PRESETS`)を決めるための実測データ源です。`verify_background_handoff.py` は `quick` プリセットの前景待機を一時的に数秒へ縮め、~17 秒で完了する自明な問いをわざと前景タイムアウトさせて、`INCOMPLETE` 即返し → ファイル未書込 → デタッチ poller が `research/` へ `.md` を後書き、という本番経路を丸ごと確認します。
 
 `capture_fixtures.py` は各 `*.json` に加えて、取得日時を `../tests/fixtures/captured_at.txt`(ISO 8601・ローカルタイムゾーン)に書き出します。fixtures がいつ時点のものかを後から追えるようにするためです。
 

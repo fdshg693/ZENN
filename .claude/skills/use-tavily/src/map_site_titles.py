@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 from tavily.errors import InvalidAPIKeyError
 
 from tavily_common import (
+    TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,
     RunOutcome,
@@ -92,7 +93,13 @@ DEFAULT_ALLOW_EXTERNAL = False
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Map a site with Tavily and fetch each page title with minimal arguments."
+        description="Map a site with Tavily and fetch each page title with minimal arguments.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Role: discovery. With --topic NAME, appends one aggregated URL+title list to\n"
+            "<TAVILY_OUTPUT_DIR>/NAME/map/NNNN-<domain>.json (one map = one file, never split).\n"
+            "Omit --topic to print one ResultEnvelope to stdout."
+        ),
     )
     parser.add_argument(
         "url",
@@ -140,7 +147,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--topic",
-        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
+        help=TOPIC_ARG_HELP,
     )
     return parser.parse_args(argv)
 
@@ -274,6 +281,7 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
         log=payload,
         result_kind=ResultKind.SITE_PAGES,
         result=pages,
+        slug=urlparse(args.url).netloc or args.url,
     )
 
 

@@ -25,23 +25,30 @@ from collections.abc import Sequence
 from tavily_common import ExitCode, finalize
 
 
-# subcommand -> (wrapper module name, one-line summary). The module names match
-# the files in this directory; each exposes ``main(argv) -> RunOutcome``.
-SUBCOMMANDS: dict[str, tuple[str, str]] = {
-    "search":         ("search_topic",            "keyword -> related URLs + snippets"),
-    "search-extract": ("search_extract_topic",    "keyword -> URLs, then extract their content"),
-    "research":       ("research_topic",          "hand a question to Tavily research, wait for the report"),
-    "extract":        ("extract_url_content",     "known URL(s) -> page content"),
-    "map":            ("map_site_titles",         "site root -> URL list with titles"),
-    "map-extract":    ("map_extract_site_content","map a site, then extract chosen URLs"),
-    "crawl":          ("crawl_site_content",      "crawl a site -> related page content"),
+# subcommand -> (wrapper module name, role tag, one-line summary). The module
+# names match the files in this directory; each exposes ``main(argv) -> RunOutcome``.
+# The role tag mirrors the topic-folder layout (PLAN.md §4): discovery files an
+# aggregated list under search/ or map/, content writes one .md page per URL under
+# pages/, report writes one .md under research/. Composites do both.
+SUBCOMMANDS: dict[str, tuple[str, str, str]] = {
+    "search":         ("search_topic",            "discovery",          "keyword -> related URLs + snippets"),
+    "search-extract": ("search_extract_topic",    "discovery+content",  "keyword -> URLs, then extract their content"),
+    "research":       ("research_topic",          "report",             "hand a question to Tavily research, wait for the report"),
+    "extract":        ("extract_url_content",     "content",            "known URL(s) -> page content"),
+    "map":            ("map_site_titles",         "discovery",          "site root -> URL list with titles"),
+    "map-extract":    ("map_extract_site_content","discovery+content",  "map a site, then extract chosen URLs"),
+    "crawl":          ("crawl_site_content",      "content",            "crawl a site -> related page content"),
 }
 
 
 def render_usage() -> str:
-    width = max(len(name) for name in SUBCOMMANDS)
-    lines = ["Usage: tav <subcommand> [args...]", "", "Subcommands:"]
-    lines += [f"  {name.ljust(width)}  {summary}" for name, (_m, summary) in SUBCOMMANDS.items()]
+    name_width = max(len(name) for name in SUBCOMMANDS)
+    role_width = max(len(role) for _name, (_m, role, _s) in SUBCOMMANDS.items())
+    lines = ["Usage: tav <subcommand> [args...]", "", "Subcommands (role = topic-folder layout):"]
+    lines += [
+        f"  {name.ljust(name_width)}  [{role.ljust(role_width)}]  {summary}"
+        for name, (_m, role, summary) in SUBCOMMANDS.items()
+    ]
     lines += ["", "Run 'tav <subcommand> --help' for that subcommand's own arguments."]
     return "\n".join(lines)
 

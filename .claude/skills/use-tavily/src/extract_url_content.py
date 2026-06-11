@@ -22,6 +22,7 @@ from typing import Any, Mapping
 from tavily.errors import InvalidAPIKeyError
 
 from tavily_common import (
+    TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,
     RunOutcome,
@@ -57,7 +58,13 @@ INCLUDE_USAGE = False
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Extract content from URLs with Tavily using minimal arguments."
+        description="Extract content from URLs with Tavily using minimal arguments.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Role: content. With --topic NAME, writes one Markdown page per URL to\n"
+            "<TAVILY_OUTPUT_DIR>/NAME/pages/NNNN-<title>.md (split, one page = one file),\n"
+            "indexed by pages/index.json. Omit --topic to print one ResultEnvelope to stdout."
+        ),
     )
     parser.add_argument(
         "urls",
@@ -76,7 +83,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--topic",
-        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
+        help=TOPIC_ARG_HELP,
     )
     return parser.parse_args(argv)
 

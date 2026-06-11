@@ -25,9 +25,11 @@ from tavily.errors import InvalidAPIKeyError
 from extract_url_content import run_extract_request
 from search_topic import run_search_request
 from tavily_common import (
+    TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,
     RunOutcome,
+    TopicArtifact,
     build_response_payload,
     create_tavily_client,
     dedupe_preserve_order,
@@ -112,7 +114,14 @@ DEFAULT_DETAIL = "balanced"
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Search with Tavily and extract content from the resulting URLs."
+        description="Search with Tavily and extract content from the resulting URLs.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Roles: discovery + content. With --topic NAME, keeps BOTH halves: the search\n"
+            "menu -> <topic>/search/NNNN-<query>.json, and the extracted bodies ->\n"
+            "<topic>/pages/NNNN-<title>.md (+ pages/index.json). Omit --topic to print one\n"
+            "ResultEnvelope (the extracted content) to stdout."
+        ),
     )
     parser.add_argument(
         "query",
@@ -138,7 +147,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--topic",
-        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
+        help=TOPIC_ARG_HELP,
     )
     return parser.parse_args(argv)
 
@@ -226,6 +235,12 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
         log=payload,
         result_kind=ResultKind.EXTRACT_RESULTS,
         result=(extraction["response"].get("results") or []) if extraction else [],
+        # Keep the discovery half too: file the search menu under <topic>/search/.
+        discovery=TopicArtifact(
+            result_kind=ResultKind.SEARCH_RESULTS,
+            result=search_run["response"].get("results") or [],
+            slug=args.query,
+        ),
         message="Search returned no URLs to extract." if exit_code is ExitCode.EMPTY_RESULT else None,
     )
 

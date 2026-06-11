@@ -18,15 +18,18 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from tavily.errors import InvalidAPIKeyError
 
 from extract_url_content import run_extract_request
 from map_site_titles import run_map_request
 from tavily_common import (
+    TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,
     RunOutcome,
+    TopicArtifact,
     build_response_payload,
     create_tavily_client,
     dedupe_preserve_order,
@@ -97,7 +100,14 @@ DEFAULT_ALLOW_EXTERNAL = False
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Map a site with Tavily and extract content from the mapped URLs."
+        description="Map a site with Tavily and extract content from the mapped URLs.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Roles: discovery + content. With --topic NAME, keeps BOTH halves: the mapped\n"
+            "URL inventory -> <topic>/map/NNNN-<domain>.json, and the extracted bodies ->\n"
+            "<topic>/pages/NNNN-<title>.md (+ pages/index.json). Omit --topic to print one\n"
+            "ResultEnvelope (the extracted content) to stdout."
+        ),
     )
     parser.add_argument(
         "url",
@@ -149,7 +159,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--topic",
-        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
+        help=TOPIC_ARG_HELP,
     )
     return parser.parse_args(argv)
 
@@ -238,12 +248,19 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
         dotenv_path=dotenv_path,
     )
 
+    mapped_urls = dedupe_preserve_order(map_run["response"].get("results") or [])
     return RunOutcome(
         exit_code=exit_code,
         topic=args.topic,
         log=payload,
         result_kind=ResultKind.EXTRACT_RESULTS,
         result=(extraction["response"].get("results") or []) if extraction else [],
+        # Keep the discovery half too: file the mapped URL inventory under <topic>/map/.
+        discovery=TopicArtifact(
+            result_kind=ResultKind.SITE_PAGES,
+            result=[{"url": url} for url in mapped_urls],
+            slug=urlparse(map_run["url"]).netloc or map_run["url"],
+        ),
         message="Map returned no URLs to extract." if exit_code is ExitCode.EMPTY_RESULT else None,
     )
 

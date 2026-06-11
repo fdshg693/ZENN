@@ -7,22 +7,24 @@ Tavily で集めた根拠を元に、Zenn 記事を **「概要提案 → 構成
 - `use-tavily` スキルが存在し、Tavily API キーがセットされていること
   - 詳細は [.claude/skills/use-tavily/README.md](../use-tavily/README.md) を参照
 - リポジトリ直下に `zenn/` ディレクトリ、その配下に `plan/` と `publish/` を作成可能なこと(初回実行時に作られる想定)
-- 調査結果の置き場として `<TAVILY_OUTPUT_DIR>/<topic>/`(既定 `temp/web/<topic>/`)が利用可能なこと。`--topic <name>` 指定でトピック単位のフォルダに出力される
+- 調査結果の置き場として `<TAVILY_OUTPUT_DIR>/<topic>/`(既定 `temp/web/<topic>/`)が利用可能なこと。本スキルは **1 記事 = 1 トピック** で、すべての調査を同じ `--topic <article_topic>` に蓄積する(フォルダ内の構成・読み方は `use-tavily` スキルに従う)
 
 ## このスキルの目的
 
 - AI に Zenn 記事を書かせるとき、「既存知識で書ききってしまう」「根拠 URL が曖昧」「構成と本文がズレる」といった事故を防ぐ
 - 記事執筆を **概要提案 → 構成 plan → 本文 publish** の 3 工程に分解し、各工程でユーザーがレビューできるチェックポイントを置く
-- Web 調査は曖昧なブラウズ指示や AI 組み込み検索ではなく、`use-tavily` のスクリプトを **明示的に使い分けさせる**
+- Web 調査は曖昧なブラウズ指示や AI 組み込み検索ではなく、`use-tavily` スキルを **明示的に使い分けさせる**
+- 1 記事 = 1 トピックに調査を集約し、資料が散らばらないようにする(同じ `--topic` を使い回す)
 - 構成案と本文の同期ルール(構成変更が入ったら plan → publish の順で更新)を固定する
 
 ## このスキルの特徴
 
 - **3 段階フロー**: 概要提案(対話)→ `zenn/plan/*.md`(構成と根拠)→ `zenn/publish/*.md`(本文)
-- **調査スキルとの分業**: Tavily への呼び出し方は `use-tavily` 側に任せ、本スキルは「いつどのスクリプトを呼ぶか」と「成果物の形」だけ規定
+- **調査スキルとの分業**: Tavily の呼び方・コマンドの使い方・出力の読み方は `use-tavily` 側に任せ、本スキルは「いつどのコマンドを呼ぶか」と「成果物の形」だけ規定
+- **1 トピック集約**: 記事ごとに `--topic` を 1 つ決めて使い回し、検索・抽出・research を 1 フォルダに蓄積。追加調査の前に既存資料を見て、足りない論点だけ調べる
 - **frontmatter ルール固定**: `published: false` をデフォルトにし、ユーザーの明示指示なしに公開状態にしない
 - **plan / publish の同期ルール**: 見出しやセクション主張が変わったら、必ず両方を一致させる
-- **サブエージェント活用ガイド**: URL 候補の洗い出し、JSON 群からの事実抽出、セクション下書きをサブエージェントに切り出すパターンを SKILL.md 内に持つ
+- **サブエージェント活用ガイド**: URL 候補の洗い出し、蓄積した調査資料からの事実抽出、セクション下書きをサブエージェントに切り出すパターンを SKILL.md 内に持つ
 
 ## クイックスタート
 
@@ -34,7 +36,7 @@ Claude Code 上で次のように呼び出します。
 
 これで以下が走ります。
 
-1. `use-tavily` で軽い事前調査(主要な公式 URL を把握)
+1. `use-tavily` で軽い事前調査(主要な公式 URL を把握。以降すべて同じ `--topic <article_topic>`)
 2. タイトル候補・想定読者・問い・扱う範囲を含む **概要案** を提示
 3. ユーザーが OK を出したら、構成詳細を `zenn/plan/{topic_slug}.md` に書き出す
 4. plan を承認すると、本文を `zenn/publish/{topic_slug}.md` に書き出す(`published: false`)
@@ -49,11 +51,13 @@ Claude Code 上で次のように呼び出します。
 └── SKILL.md    ← AI に読ませるスキル本体(3 段階フローの手順 / frontmatter ルール / サブエージェント指示例)
 
 リポジトリ直下:
-├── temp/web/<topic>/          ← use-tavily が出す調査 JSON(--topic 単位。集約 search.json/map.json、分割 0001.json…+index.json、単一 research.json)
+├── temp/web/<article_topic>/  ← use-tavily が --topic ごとに蓄積する調査結果(役割別サブフォルダ構成は use-tavily スキル参照)
 └── zenn/
     ├── plan/{topic_slug}.md     ← 構成案(レビュー用、簡易 frontmatter + status: plan)
     └── publish/{topic_slug}.md  ← 本文(Zenn frontmatter 完備、デフォルト published: false)
 ```
+
+> 調査フォルダの中身(役割別サブフォルダ・索引・本文ファイルの読み方)は `use-tavily` スキルが正本です。本スキルは「同じ `--topic` に蓄積し、その結果を読む」ところだけを規定します。
 
 ## カスタマイズ箇所
 
@@ -78,4 +82,4 @@ Claude Code 上で次のように呼び出します。
 
 ## 詳細
 
-実際の調査手順、スクリプト選択基準、サブエージェント指示テンプレ、plan / publish の同期ルールは [SKILL.md](SKILL.md) を参照してください。Tavily スクリプト側の使い方は [.claude/skills/use-tavily/README.md](../use-tavily/README.md) と [.claude/skills/use-tavily/SKILL.md](../use-tavily/SKILL.md) にあります。
+実際の調査手順、コマンド選択基準、サブエージェント指示テンプレ、plan / publish の同期ルールは [SKILL.md](SKILL.md) を参照してください。`tav` コマンド側の使い方・出力レイアウトは [.claude/skills/use-tavily/README.md](../use-tavily/README.md) と [.claude/skills/use-tavily/SKILL.md](../use-tavily/SKILL.md) が正本です。

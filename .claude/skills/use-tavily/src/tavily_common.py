@@ -42,6 +42,7 @@ from dataclasses import dataclass
 from enum import Enum, IntEnum
 import json
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any, TypedDict
@@ -57,8 +58,50 @@ LOG_DIRECTORY = Path(__file__).resolve().parent / "logs"
 # Output-layout settings, read from the environment (see README "設定とパス解決").
 OUTPUT_DIR_ENV = "TAVILY_OUTPUT_DIR"
 WRITE_LOG_ENV = "TAVILY_WRITE_LOG"
+SHOW_OUTPUT_PATHS_ENV = "TAVILY_SHOW_OUTPUT_PATHS"
 DEFAULT_OUTPUT_DIR = "temp/web"
 INDEX_FILE_NAME = "index.json"
+
+# Shared ``--topic`` help, reused by every wrapper's ``--topic`` argument so the
+# accumulate-into-role-subfolders contract is described in exactly one place (§4
+# of PLAN.md "集約 vs 分割をコード/CLI ヘルプから明確化").
+TOPIC_ARG_HELP = (
+    "Accumulate this run into <TAVILY_OUTPUT_DIR>/NAME/. Discovery commands "
+    "(search/map) append one list file under search/ or map/; content commands "
+    "(extract/crawl) write one .md per page under pages/ (indexed by pages/index.json); "
+    "research writes one .md under research/. Existing files are kept (never "
+    "overwritten). Omit --topic to print one ResultEnvelope to stdout."
+)
+
+# ---------------------------------------------------------------------------
+# Role-based topic layout (PLAN.md §0-§3). A ``--topic`` run's output is filed by
+# the *role* of its ``result_kind`` — never one flat namespace — so the kinds of
+# output (a discovery menu, fetched page bodies, a finished report) never mix:
+#
+#   discovery (search/map) -> aggregate JSON list, one file per task:
+#                             <topic>/search/NNNN-<slug>.json or <topic>/map/...
+#   content   (extract/crawl) -> one Markdown page per URL + a pages/index.json:
+#                             <topic>/pages/NNNN-<slug>.md
+#   report    (research) -> one Markdown report per question:
+#                             <topic>/research/NNNN-<slug>.md (.json on failure)
+#
+# ``NNNN`` is allocated independently inside each subfolder (never a cross-role
+# running number) and continues from the existing max on re-runs, so the same
+# topic *accumulates* (appends) instead of overwriting.
+# ---------------------------------------------------------------------------
+ROLE_DISCOVERY = "discovery"
+ROLE_CONTENT = "content"
+ROLE_REPORT = "report"
+
+ROLE_FOR_KIND: dict["ResultKind", str] = {}      # filled after ResultKind is defined
+SUBDIR_FOR_KIND: dict["ResultKind", str] = {}    # role subfolder name per result_kind
+
+# Projection allow-lists (PLAN.md §4③): the ONLY keys kept when a result item is
+# written to a topic file or printed to stdout. Everything else (raw_content==None
+# on search, empty images on extract, fetch metadata on site pages, ...) is research-
+# irrelevant noise and dropped. The full untouched objects still live in the audit
+# log. Edit these tuples to change what survives projection.
+PROJECTION_KEYS: dict["ResultKind", tuple[str, ...]] = {}  # filled after ResultKind
 
 
 class ExitCode(IntEnum):
@@ -92,6 +135,41 @@ class ResultKind(str, Enum):
     CRAWL_RESULTS = "crawl_results"        # list[CrawlResultItem]: Tavily crawl result objects.
     SITE_PAGES = "site_pages"              # list[SitePageItem]: page-title records (see PageTitleResult / SitePageItem).
     RESEARCH_REPORT = "research_report"    # str (markdown report) on success, else the raw final response dict.
+
+
+# Populate the role-layout tables now that ResultKind exists (see the role-layout
+# block near the top of this module for what each entry means).
+ROLE_FOR_KIND.update(
+    {
+        ResultKind.SEARCH_RESULTS: ROLE_DISCOVERY,
+        ResultKind.SITE_PAGES: ROLE_DISCOVERY,
+        ResultKind.EXTRACT_RESULTS: ROLE_CONTENT,
+        ResultKind.CRAWL_RESULTS: ROLE_CONTENT,
+        ResultKind.RESEARCH_REPORT: ROLE_REPORT,
+    }
+)
+SUBDIR_FOR_KIND.update(
+    {
+        ResultKind.SEARCH_RESULTS: "search",
+        ResultKind.SITE_PAGES: "map",
+        ResultKind.EXTRACT_RESULTS: "pages",
+        ResultKind.CRAWL_RESULTS: "pages",
+        ResultKind.RESEARCH_REPORT: "research",
+    }
+)
+PROJECTION_KEYS.update(
+    {
+        # search rows: triage columns only. raw_content is always None under our flags.
+        ResultKind.SEARCH_RESULTS: ("url", "title", "content", "score"),
+        # extract pages: identity + body. images is always empty under our flags.
+        ResultKind.EXTRACT_RESULTS: ("url", "title", "raw_content"),
+        # crawl pages: url + body only (crawl items never carry a title).
+        ResultKind.CRAWL_RESULTS: ("url", "raw_content"),
+        # site-page menu: url + readable titles; fetch metadata is dropped.
+        ResultKind.SITE_PAGES: ("url", "title", "short_title"),
+        # research_report has no per-item projection (it is a single str/dict).
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +301,7 @@ class OutputChannel(str, Enum):
     """
 
     RESULT_STDOUT = "result_stdout"   # ResultEnvelope JSON -> stdout (only when --topic is absent).
-    RESULT_FILE = "result_file"       # ResultEnvelope / index JSON -> a file in the topic folder.
+    RESULT_FILE = "result_file"       # .json (discovery list / index / failed report) or .md (page / report) -> a topic-folder file.
     AUDIT_LOG = "audit_log"           # ResponseEnvelope JSON -> logs/<script>-log.json (when TAVILY_WRITE_LOG).
     DIAGNOSTIC = "diagnostic"         # one human/AI-facing line -> stderr (never stdout, never structured).
 
@@ -267,6 +345,23 @@ class ResultEnvelope(TypedDict):
 
 
 @dataclass(slots=True)
+class TopicArtifact:
+    """A secondary role-output a run also wants persisted under ``--topic``.
+
+    Composite commands produce two artifacts of *different roles*: the discovery
+    menu they searched/mapped AND the page content they then extracted. ``main()``
+    returns the content as the primary ``RunOutcome.result`` and the discovery
+    menu as ``RunOutcome.discovery`` (one of these), so "what was searched" and
+    "what was fetched" both land in the topic folder, each in its own role
+    subfolder. ``slug`` names the task (query / domain) for the ``NNNN-<slug>`` file.
+    """
+
+    result_kind: ResultKind
+    result: Any
+    slug: str | None = None
+
+
+@dataclass(slots=True)
 class RunOutcome:
     """The complete, side-effect-free return value of a script's ``main()``.
 
@@ -278,9 +373,17 @@ class RunOutcome:
     - ``log`` + ``result_kind`` + ``result``: the data to emit. All three are set
       on a run that reached the request stage; all three stay ``None`` on an early
       failure (e.g. missing credentials) where there is nothing to emit.
-    - ``topic``: the ``--topic`` value. When set, ``finalize()`` writes the result
-      into ``<TAVILY_OUTPUT_DIR>/<topic>/`` using the layout for ``result_kind``.
-      When ``None``, the single ``ResultEnvelope`` goes to stdout (pipe use).
+    - ``topic``: the ``--topic`` value. When set, ``finalize()`` files the result
+      into ``<TAVILY_OUTPUT_DIR>/<topic>/`` under the role subfolder for
+      ``result_kind`` (search/ map/ pages/ research/). When ``None``, the single
+      ``ResultEnvelope`` goes to stdout (pipe use).
+    - ``slug``: task-level slug hint for the ``NNNN-<slug>`` file name of the
+      discovery/report writers (the search query, the mapped domain, the research
+      question). Ignored by the content writer, which slugs each page from its own
+      title. ``None`` falls back to a generic stem.
+    - ``discovery``: an optional second ``TopicArtifact`` (composite commands only)
+      filed alongside the primary result in its own role subfolder; ignored on the
+      stdout path so the pipe contract stays one envelope.
     - ``message``: a single stderr line to print, if any (errors, empty/incomplete
       notices). ``None`` means stay silent on stderr.
     """
@@ -291,6 +394,8 @@ class RunOutcome:
     result_kind: ResultKind | None = None
     result: Any = None
     message: str | None = None
+    slug: str | None = None
+    discovery: TopicArtifact | None = None
 
 
 def finalize(outcome: RunOutcome) -> ExitCode:
@@ -308,6 +413,8 @@ def finalize(outcome: RunOutcome) -> ExitCode:
             result_kind=outcome.result_kind,
             result=outcome.result,
             exit_code=outcome.exit_code,
+            slug=outcome.slug,
+            discovery=outcome.discovery,
         )
     if outcome.message:
         emit(OutputChannel.DIAGNOSTIC, outcome.message)
@@ -348,16 +455,39 @@ def get_output_dir() -> Path:
     return Path(value or DEFAULT_OUTPUT_DIR)
 
 
+_FALSEY_ENV_VALUES = {"", "false", "0", "no", "off"}
+
+
+def _env_flag(name: str, *, default: bool = True) -> bool:
+    """Parse a boolean toggle env var with the shared falsey convention.
+
+    Default (unset) is ``default``. Values ``false`` / ``0`` / ``no`` / ``off`` /
+    empty (case-insensitive) read as ``False``; anything else reads as ``True``.
+    """
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() not in _FALSEY_ENV_VALUES
+
+
 def should_write_log() -> bool:
     """Whether to write ``logs/<script>-log.json``, from ``TAVILY_WRITE_LOG``.
 
     Default (unset) is ``True`` — the historical always-on behavior. Values
     ``false`` / ``0`` / ``no`` / ``off`` / empty (case-insensitive) suppress it.
     """
-    raw = os.getenv(WRITE_LOG_ENV)
-    if raw is None:
-        return True
-    return raw.strip().lower() not in {"", "false", "0", "no", "off"}
+    return _env_flag(WRITE_LOG_ENV)
+
+
+def should_show_output_paths() -> bool:
+    """Whether to echo "Wrote ... to <path>" notices, from ``TAVILY_SHOW_OUTPUT_PATHS``.
+
+    Default (unset) is ``True``. Same falsey convention as ``should_write_log()``.
+    This toggles ONLY the stderr ``DIAGNOSTIC`` path notices (audit log + each
+    role writer); error / empty / incomplete ``message`` lines and the files
+    themselves are unaffected.
+    """
+    return _env_flag(SHOW_OUTPUT_PATHS_ENV)
 
 
 def resolve_output_target(topic: str, *, output_dir: Path | None = None) -> Path:
@@ -371,27 +501,90 @@ def resolve_output_target(topic: str, *, output_dir: Path | None = None) -> Path
     return base / safe_topic
 
 
-def output_shape_for(result_kind: ResultKind) -> str:
-    """Classify a ``result_kind`` into one of the three output layouts.
+def role_for(result_kind: ResultKind) -> str:
+    """The output role (discovery / content / report) a ``result_kind`` belongs to.
 
-    - ``"aggregate"``: one file holding the whole url+title list (no page content).
-    - ``"split"``: one file per URL plus an ``index.json`` (page content present).
-    - ``"single"``: one file for a single indivisible artifact (research report).
+    This 3-way dispatch is the single source of truth for "where does this land":
+    discovery -> a list file under search/ or map/, content -> Markdown pages
+    under pages/, report -> a Markdown report under research/ (see ROLE_FOR_KIND).
     """
-    if result_kind in (ResultKind.SEARCH_RESULTS, ResultKind.SITE_PAGES):
-        return "aggregate"
-    if result_kind in (ResultKind.EXTRACT_RESULTS, ResultKind.CRAWL_RESULTS):
-        return "split"
-    return "single"
+    return ROLE_FOR_KIND[result_kind]
 
 
-def layout_filename_for(result_kind: ResultKind) -> str:
-    """File name used by the aggregate / single layouts (command-named)."""
-    return {
-        ResultKind.SEARCH_RESULTS: "search.json",
-        ResultKind.SITE_PAGES: "map.json",
-        ResultKind.RESEARCH_REPORT: "research.json",
-    }.get(result_kind, f"{result_kind.value}.json")
+_SLUG_SEPARATOR = re.compile(r"[^\w]+", re.UNICODE)
+_SEQUENCE_PREFIX = re.compile(r"^(\d{4})")
+
+
+def slugify(text: str | None, *, max_length: int = 50) -> str:
+    """Turn arbitrary text (a query / domain / title) into a safe file-name stem.
+
+    Collapses runs of non-word characters to single hyphens and lowercases ASCII,
+    so ``"Fabric vs Synapse"`` -> ``"fabric-vs-synapse"`` and
+    ``"learn.microsoft.com"`` -> ``"learn-microsoft-com"``. Unicode word characters
+    (e.g. Japanese) are kept verbatim — they are valid, self-describing file names.
+    Empty / punctuation-only input falls back to ``"item"``.
+    """
+    lowered = (text or "").strip().lower()
+    slug = _SLUG_SEPARATOR.sub("-", lowered).strip("-")
+    if len(slug) > max_length:
+        slug = slug[:max_length].rstrip("-")
+    return slug or "item"
+
+
+def next_sequence(directory: Path) -> int:
+    """Next ``NNNN`` to allocate inside one role subfolder (existing max + 1).
+
+    Scans for files whose name starts with a 4-digit number and returns one past
+    the highest, so re-running the same topic *appends* (``0003`` after ``0002``)
+    rather than overwriting. Sequencing is per-subfolder, so search/ and pages/
+    keep independent series. Assumes sequential (non-concurrent) runs against a
+    topic — parallel allocation could collide.
+    """
+    if not directory.exists():
+        return 1
+    highest = 0
+    for entry in directory.iterdir():
+        match = _SEQUENCE_PREFIX.match(entry.name)
+        if match:
+            highest = max(highest, int(match.group(1)))
+    return highest + 1
+
+
+def slim_result_item(result_kind: ResultKind, item: Any) -> Any:
+    """Project one result item down to its research-relevant keys (PLAN.md §4③).
+
+    Drops keys that carry no signal for research triage/reading (per
+    ``PROJECTION_KEYS``). Non-dict items (e.g. a research report str) and kinds
+    with no projection are returned unchanged. The full objects still live in the
+    audit log; this only shapes what reaches topic files / stdout.
+    """
+    keys = PROJECTION_KEYS.get(result_kind)
+    if keys is None or not isinstance(item, dict):
+        return item
+    return {key: item[key] for key in keys if key in item}
+
+
+def project_result(result_kind: ResultKind, result: Any) -> Any:
+    """Apply ``slim_result_item`` across a result (list -> list, else unchanged)."""
+    if isinstance(result, list):
+        return [slim_result_item(result_kind, item) for item in result]
+    return result
+
+
+def render_page_markdown(title: str | None, body: str | None) -> str:
+    """Render one fetched page as ``# <title>`` + body Markdown (content role).
+
+    The body (Tavily's ``raw_content``, already Markdown under our ``format``
+    flag) is written as-is — far more readable than the same text escaped inside a
+    JSON string. ``images`` / fetch metadata are intentionally NOT carried in (the
+    projection already dropped them); url<->file<->title structure lives in
+    ``pages/index.json``.
+    """
+    heading = (title or "Untitled").strip() or "Untitled"
+    body_text = (body or "").strip()
+    if body_text:
+        return f"# {heading}\n\n{body_text}\n"
+    return f"# {heading}\n"
 
 
 def get_missing_api_key_message(dotenv_path: str | None) -> str:
@@ -487,46 +680,93 @@ def emit_payload(
     result_kind: ResultKind,
     result: Any,
     exit_code: ExitCode = ExitCode.SUCCESS,
+    slug: str | None = None,
+    discovery: TopicArtifact | None = None,
     pretty: bool = True,
 ) -> None:
-    """Emit a run's record artifacts under the topic layout, routed through ``emit()``.
+    """Emit a run's record artifacts, routed through ``emit()``.
 
-    Audit log: the full ``ResponseEnvelope`` -> ``logs/<script>-log.json``
+    Audit log: the full, unprojected ``ResponseEnvelope`` -> ``logs/<script>-log.json``
     (``AUDIT_LOG``), only when ``should_write_log()`` is true.
 
     Result, by ``topic``:
 
-    - ``topic is None``: a single ``ResultEnvelope`` -> stdout (``RESULT_STDOUT``),
-      preserving the pipe contract for callers that read ``result`` off stdout.
-    - ``topic`` set: written into ``<TAVILY_OUTPUT_DIR>/<topic>/`` using the layout
-      that ``output_shape_for(result_kind)`` selects — aggregate (one file), split
-      (per-URL files + ``index.json``), or single (one file).
+    - ``topic is None``: a single ``ResultEnvelope`` (with ``result`` *projected*
+      to research-relevant keys) -> stdout (``RESULT_STDOUT``). The pipe contract
+      stays one envelope; ``discovery`` is ignored here.
+    - ``topic`` set: filed into ``<TAVILY_OUTPUT_DIR>/<topic>/`` by ``result_kind``'s
+      role — discovery (a list file under search/ or map/), content (Markdown pages
+      under pages/ + index), or report (a Markdown report under research/). A
+      ``discovery`` artifact, when present, is filed alongside in its own role
+      subfolder so a composite run keeps both its menu and its fetched bodies.
 
-    ``result_kind`` and ``exit_code`` make every emitted ``ResultEnvelope``
-    self-describing. Every accompanying notice is a ``DIAGNOSTIC`` on stderr.
+    Every accompanying notice is a ``DIAGNOSTIC`` on stderr, gated by
+    ``should_show_output_paths()``.
     """
     script_name = payload.get("script", "payload")
 
     if should_write_log():
         log_path = build_log_output_path(script_name=script_name)
         emit(OutputChannel.AUDIT_LOG, payload, path=log_path, pretty=pretty)
-        emit(OutputChannel.DIAGNOSTIC, f"Wrote full log to {log_path}")
+        if should_show_output_paths():
+            emit(OutputChannel.DIAGNOSTIC, f"Wrote full log to {log_path}")
 
     if topic is None:
         result_envelope = build_result_envelope(
             script_name=script_name,
             result_kind=result_kind,
-            result=result,
+            result=project_result(result_kind, result),
             exit_code=exit_code,
         )
         emit(OutputChannel.RESULT_STDOUT, result_envelope, pretty=pretty)
         return
 
     target_dir = resolve_output_target(topic)
-    shape = output_shape_for(result_kind)
-    if shape == "split":
-        write_split_results(
+    write_topic_artifact(
+        target_dir,
+        script_name=script_name,
+        result_kind=result_kind,
+        result=result,
+        slug=slug,
+        exit_code=exit_code,
+        topic=topic,
+        pretty=pretty,
+    )
+    if discovery is not None:
+        write_topic_artifact(
             target_dir,
+            script_name=script_name,
+            result_kind=discovery.result_kind,
+            result=discovery.result,
+            slug=discovery.slug,
+            exit_code=exit_code,
+            topic=topic,
+            pretty=pretty,
+        )
+
+
+def write_topic_artifact(
+    target_dir: Path,
+    *,
+    script_name: str,
+    result_kind: ResultKind,
+    result: Any,
+    slug: str | None,
+    exit_code: ExitCode,
+    topic: str,
+    pretty: bool = True,
+) -> None:
+    """Dispatch one (result_kind, result) to its role writer under ``target_dir``.
+
+    The role (``role_for``) picks both the writer and the subfolder
+    (``SUBDIR_FOR_KIND``): discovery -> ``write_discovery_list``, content ->
+    ``write_content_pages``, report -> ``write_report``.
+    """
+    role = role_for(result_kind)
+    role_dir = target_dir / SUBDIR_FOR_KIND[result_kind]
+    if role == ROLE_CONTENT:
+        write_content_pages(
+            role_dir,
             script_name=script_name,
             result_kind=result_kind,
             result=result,
@@ -534,42 +774,93 @@ def emit_payload(
             topic=topic,
             pretty=pretty,
         )
-    else:
-        # aggregate and single both write one command-named ResultEnvelope file.
-        write_single_file_result(
-            target_dir,
+    elif role == ROLE_REPORT:
+        write_report(
+            role_dir,
             script_name=script_name,
             result_kind=result_kind,
             result=result,
+            slug=slug,
+            exit_code=exit_code,
+            pretty=pretty,
+        )
+    else:
+        write_discovery_list(
+            role_dir,
+            script_name=script_name,
+            result_kind=result_kind,
+            result=result,
+            slug=slug,
             exit_code=exit_code,
             pretty=pretty,
         )
 
 
-def write_single_file_result(
-    target_dir: Path,
+def write_discovery_list(
+    role_dir: Path,
     *,
     script_name: str,
     result_kind: ResultKind,
     result: Any,
+    slug: str | None,
     exit_code: ExitCode,
     pretty: bool = True,
 ) -> None:
-    """Write one command-named ``ResultEnvelope`` file (aggregate / single layouts).
+    """Discovery role: append one projected list file ``NNNN-<slug>.json``.
 
-    ``search`` / ``map`` write their whole url+title list here (aggregate);
-    ``research`` writes its single markdown report here (single). The file name
-    comes from ``layout_filename_for(result_kind)`` (e.g. ``search.json``).
+    ``search`` / ``map`` menus are skimmed as a table AND fed to the next extract
+    step, so they stay machine-readable JSON and stay *aggregated* (one task = one
+    file): splitting a 5-row menu across 5 files would destroy its at-a-glance
+    value. No side index — the file name is self-describing (``ls`` is enough).
     """
+    items = [slim_result_item(result_kind, item) for item in (result or []) if isinstance(item, dict)]
+    sequence = next_sequence(role_dir)
+    file_name = f"{sequence:04d}-{slugify(slug)}.json"
     envelope = build_result_envelope(
         script_name=script_name,
         result_kind=result_kind,
-        result=result,
+        result=items,
         exit_code=exit_code,
     )
-    file_path = target_dir / layout_filename_for(result_kind)
+    file_path = role_dir / file_name
     emit(OutputChannel.RESULT_FILE, envelope, path=file_path, pretty=pretty)
-    emit(OutputChannel.DIAGNOSTIC, f"Wrote result envelope to {file_path}")
+    if should_show_output_paths():
+        emit(OutputChannel.DIAGNOSTIC, f"Wrote {len(items)} {result_kind.value} row(s) to {file_path}")
+
+
+def write_report(
+    research_dir: Path,
+    *,
+    script_name: str,
+    result_kind: ResultKind,
+    result: Any,
+    slug: str | None,
+    exit_code: ExitCode,
+    pretty: bool = True,
+) -> None:
+    """Report role: append one ``NNNN-<slug>`` research report.
+
+    Success (a Markdown ``str``) is written as ``.md`` so it reads straight
+    through; any non-success terminal (the raw final dict) is preserved as ``.json``
+    inside a ``ResultEnvelope`` for cause tracing.
+    """
+    sequence = next_sequence(research_dir)
+    base = f"{sequence:04d}-{slugify(slug)}"
+    if exit_code == ExitCode.SUCCESS and isinstance(result, str):
+        file_path = research_dir / f"{base}.md"
+        markdown = result if result.endswith("\n") else result + "\n"
+        emit(OutputChannel.RESULT_FILE, markdown, path=file_path, pretty=pretty)
+    else:
+        file_path = research_dir / f"{base}.json"
+        envelope = build_result_envelope(
+            script_name=script_name,
+            result_kind=result_kind,
+            result=result,
+            exit_code=exit_code,
+        )
+        emit(OutputChannel.RESULT_FILE, envelope, path=file_path, pretty=pretty)
+    if should_show_output_paths():
+        emit(OutputChannel.DIAGNOSTIC, f"Wrote research report to {file_path}")
 
 
 def ensure_item_titles(items: Sequence[dict[str, Any]]) -> list[tuple[str, str]]:
@@ -609,8 +900,26 @@ def ensure_item_titles(items: Sequence[dict[str, Any]]) -> list[tuple[str, str]]
     return [pair if pair is not None else ("", "url_fallback") for pair in resolved]
 
 
-def write_split_results(
-    target_dir: Path,
+def load_pages_index(pages_dir: Path, *, topic: str) -> dict[str, Any]:
+    """Load ``pages/index.json`` for append, or seed a fresh one.
+
+    The index is the ONE shared file the content role accumulates (its ``entries``
+    grow across runs). An unreadable / old-schema file is discarded and rebuilt
+    (no migration), so a corrupt index never blocks a run.
+    """
+    index_path = pages_dir / INDEX_FILE_NAME
+    if index_path.exists():
+        try:
+            data = json.loads(index_path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            data = None
+        if isinstance(data, dict) and isinstance(data.get("entries"), list):
+            return data
+    return {"topic": topic, "entries": []}
+
+
+def write_content_pages(
+    pages_dir: Path,
     *,
     script_name: str,
     result_kind: ResultKind,
@@ -619,52 +928,47 @@ def write_split_results(
     topic: str,
     pretty: bool = True,
 ) -> None:
-    """Write one ``NNNN.json`` per URL plus a master ``index.json`` (split layout).
+    """Content role: one Markdown page per URL + an appended ``pages/index.json``.
 
-    Used by content-series commands (``extract`` / ``crawl`` / ``search_extract`` /
-    ``map_extract``). Each per-URL file is a self-describing ``ResultEnvelope``
-    whose ``result`` is that one content item; titles are back-filled first so the
-    index always carries a human-readable title. Files are numbered from
-    ``0001.json`` (4-digit). A re-run with the same topic overwrites these files.
+    Page bodies are *split* (one ``NNNN-<slug>.md`` each) because they are large
+    and read one at a time; aggregating them would be unreadable. Titles are
+    back-filled first (``ensure_item_titles`` — direct HTML fetch, never Tavily) so
+    each page gets a self-describing slug + H1 and the index carries a real title.
+    Sequence numbers continue from the existing pages (append, never overwrite);
+    re-extracting the same URL adds another page + index entry (duplicates kept).
+    ``pages/index.json`` is the only url<->file<->title<->source map.
     """
     items: list[dict[str, Any]] = [item for item in (result or []) if isinstance(item, dict)]
     titles = ensure_item_titles(items)
 
-    entries: list[dict[str, Any]] = []
-    for position, (item, (title, title_source)) in enumerate(zip(items, titles), start=1):
-        file_name = f"{position:04d}.json"
-        enriched = dict(item)
-        if not (enriched.get("title") or "").strip():
-            enriched["title"] = title
-        envelope = build_result_envelope(
-            script_name=script_name,
-            result_kind=result_kind,
-            result=enriched,
-            exit_code=exit_code,
-        )
-        emit(OutputChannel.RESULT_FILE, envelope, path=target_dir / file_name, pretty=pretty)
-        entries.append(
+    index = load_pages_index(pages_dir, topic=topic)
+    start = next_sequence(pages_dir)
+    written = 0
+    for offset, (item, (title, title_source)) in enumerate(zip(items, titles)):
+        sequence = start + offset
+        file_name = f"{sequence:04d}-{slugify(title)}.md"
+        markdown = render_page_markdown(title, item.get("raw_content"))
+        emit(OutputChannel.RESULT_FILE, markdown, path=pages_dir / file_name, pretty=pretty)
+        index["entries"].append(
             {
                 "file": file_name,
                 "url": item.get("url"),
                 "title": title,
                 "title_source": title_source,
+                "script": script_name,
+                "result_kind": result_kind.value,
                 "exit_code": int(exit_code),
             }
         )
+        written += 1
 
-    index = {
-        "script": script_name,
-        "result_kind": result_kind.value,
-        "topic": topic,
-        "entries": entries,
-    }
-    index_path = target_dir / INDEX_FILE_NAME
+    index_path = pages_dir / INDEX_FILE_NAME
     emit(OutputChannel.RESULT_FILE, index, path=index_path, pretty=pretty)
-    emit(
-        OutputChannel.DIAGNOSTIC,
-        f"Wrote {len(entries)} per-URL file(s) and index to {index_path}",
-    )
+    if should_show_output_paths():
+        emit(
+            OutputChannel.DIAGNOSTIC,
+            f"Wrote {written} page .md file(s); index now has {len(index['entries'])} entr(ies) at {index_path}",
+        )
 
 
 def dedupe_preserve_order(values: Sequence[str]) -> list[str]:
@@ -680,5 +984,10 @@ def dedupe_preserve_order(values: Sequence[str]) -> list[str]:
 
 
 def write_output(output_path: Path, payload: Any, *, pretty: bool = True) -> None:
+    """Write a file. A ``str`` payload (Markdown) is written verbatim; anything
+    else is JSON-serialized. This is what lets ``RESULT_FILE`` carry both the
+    ``.json`` discovery/index files and the ``.md`` content/report files without a
+    new channel (PLAN.md §2)."""
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(render_json(payload, pretty=pretty), encoding="utf-8")
+    text = payload if isinstance(payload, str) else render_json(payload, pretty=pretty)
+    output_path.write_text(text, encoding="utf-8")

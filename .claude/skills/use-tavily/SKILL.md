@@ -1,13 +1,15 @@
 ---
-# Version 2.0.0
+# Version 3.0.0
 name: use-tavily
 description: Skill to understand how to utilize Tavily to achieve specific goals in this project. **NOT HOW TO USE TAVILY SDK**. For that, see the `tavily-sdk` skill. 
 
 # 同階層の.envファイルに有効なTAVILY_API_KEYの設定が必要
-# 同じ .env で TAVILY_OUTPUT_DIR(出力先ベース、未設定時は temp/web)と TAVILY_WRITE_LOG(監査ログ出力トグル、未設定=true)も設定できる
+# 同じ .env で TAVILY_OUTPUT_DIR(出力先ベース、未設定時は temp/web)・TAVILY_WRITE_LOG(監査ログ出力トグル、未設定=true)・TAVILY_SHOW_OUTPUT_PATHS(「Wrote … to <path>」通知トグル、未設定=true)も設定できる
 # Python が使える環境
 # tavily / python-dotenv がグローバルにインストールされていること
 # 短縮コマンド tav を使うには、初回のみ `pip install -e .claude/skills/use-tavily` を実行する
+
+# zenn スキルは、このスキルに依存している。
 ---
 
 ## エントリポイント: `tav` コマンド
@@ -68,26 +70,13 @@ description: Skill to understand how to utilize Tavily to achieve specific goals
 - topic 起点なら、まず `tav search`
 - URL 起点なら、まず `tav extract`
 - サイト起点なら、まず `tav map`
+- なお URL 本文の取得は `tav extract` を使い、Python などで直接 HTML を取る方法はこのスキルでは原則非推奨。
 
 ## Windows / bash の注意
 
 - `tav` はインストール済みなら PowerShell でも bash でもそのまま `tav search "..."` で呼べる(PATH 上の console コマンドなので、シェルによるパス記法の差を受けない)。
 - 出力先は `--topic <name>` で指定する(トピック名のスラッグだけ。実際の保存先は `<TAVILY_OUTPUT_DIR>/<topic>/` に解決される)。`--topic` を省くと単一 `ResultEnvelope` を stdout に出す。シェルによるパス記法の差を受けないのが利点。
 - `tav` を使わず生のスクリプトを叩く場合のみ、bash では `python ./.claude/skills/use-tavily/src/search_topic.py "..."` のように `./` と `/` を使い、`\` 区切りは避ける。
-
-## ユースケースごとの使い分け
-
-- 特定サイトの網羅的な情報抽出
-  - URL 一覧の取得だけ Tavily を使い、その後は自前処理で制御したい: `map`
-  - URL 取得から本文回収まで Tavily に任せたい: `crawl`
-  - URL をいったん見極めてから本文抽出したい: `map` -> `extract`
-- 特定 URL から内容を取得
-  - 対象 URL がすでに決まっている: `extract`
-  - Python などで直接 HTML を取る方法もあるが、このスキルでは原則として非推奨
-- キーワードに関連した情報抽出
-  - まず関連 URL やスニペットを把握したい: `search`
-  - 根拠 URL の本文まで続けて確認したい: `search` -> `extract`
-  - AI に調査と要約まで任せたい: `research`
 
 ## `--detail` プリセット早見表
 
@@ -109,54 +98,67 @@ description: Skill to understand how to utilize Tavily to achieve specific goals
 - 普段の標準: `balanced`
 - URL 数や抽出粒度を増やしたい再実行: `max`
 
+`--query`/`query_chunks` の挙動に注意: `extract` / `crawl` / `*-extract` で `--query` を渡すと、本文全体ではなく **query に関連するチャンクだけ** を返す(`query_chunks` がその上限)。出力に現れる `[...]` はチャンク境界(=途中が省かれた非連続抽出)で、抽出失敗ではない。**本文を丸ごと取りたいときは `--query` を付けず、必要なら `--detail max` で再実行する**。
+
 ## 出力先と `--topic` レイアウト
 
-出力先はフルパスではなく `--topic <name>` で指定する。実際の保存先は `<TAVILY_OUTPUT_DIR>/<topic>/`(`.env` の `TAVILY_OUTPUT_DIR`、未設定時は `temp/web`)に解決される。`topic` は記事やテーマ単位の短いスラッグ(英数字と `_`)に揃える。
+出力先はフルパスではなく `--topic <name>` で指定する。実際の保存先は `<TAVILY_OUTPUT_DIR>/<topic>/`(`.env` の `TAVILY_OUTPUT_DIR`、未設定時は `temp/web`)に解決される。`topic` は **記事やテーマ単位の「調査タスクをためる作業場」** で、短いスラッグ(英数字と `_`)に揃える。同じ `--topic` を何度叩いても**上書きせず追記**していく(下記)。
 
-**解決の基準ディレクトリ(重要)**: `TAVILY_OUTPUT_DIR` が絶対パスならそのまま使う。相対パス(既定の `temp/web` を含む)は **コマンドを実行したカレントディレクトリ基準**で解決される(`.env` の場所でも、スクリプトの場所でもない)。したがって出力は `<実行時のcwd>/<TAVILY_OUTPUT_DIR>/<topic>/` に作られる。意図どおり `./temp/web/<topic>/` に出すには、**リポジトリルートから実行する**こと(旧来の `--output temp/web/...` も同じく cwd 基準だった)。`temp/web` を使う他スキル(例: `zenn`)も、この「ルートから実行」前提を共有する。
+- `--topic <name>` を渡す → トピックフォルダ配下に**役割サブフォルダ**で書き出す(下記)。
+- `--topic` を省く → 単一 `ResultEnvelope`(投影済み)を stdout に出す(パイプ用途。従来どおり)。
 
-- `--topic <name>` を渡す → トピックフォルダ配下に新レイアウトで書き出す(下記)。
-- `--topic` を省く → 単一 `ResultEnvelope` を stdout に出す(パイプ用途。従来どおり)。
+トピックフォルダ内は、出力の**役割**でサブフォルダを分ける(役割が違うものを同じ連番列に混ぜない)。役割は `result_kind` で一意に決まる:
 
-旧来の `--output temp/web/<command>_<slug>.json`(スクリプトごとにフルパスを毎回手書きする)は廃止した(後方互換なし)。トピックフォルダ内のレイアウトは `result_kind` で決まる 3 系統:
+| 役割 | コマンド | 置き場 | 形式 | 単位 |
+|------|---------|--------|------|------|
+| **discovery(候補メニュー)** | `search` → `search/` / `map` → `map/` | `NNNN-<slug>.json` | **集約 JSON リスト**(1 タスク=1 ファイル、URL 単位に分割しない) | 1 クエリ / 1 map = 1 ファイル |
+| **content(取得本文)** | `extract` / `crawl` | `pages/` | **分割 Markdown**(`# <title>` + 本文)+ `pages/index.json` | 1 ページ = 1 ファイル |
+| **report(成果物)** | `research` | `research/` | **単一 Markdown**(失敗時のみ `.json`) | 1 問い = 1 ファイル |
 
-- **集約(aggregate)**: `search` → `search.json` / `map` → `map.json`。url+title の一覧をコマンド名のファイル 1 つにまとめる。中身は通常の `ResultEnvelope`。
-- **分割(split)**: `extract` / `crawl` / `search-extract` / `map-extract`。URL ごとに `0001.json`, `0002.json`, …(0001 から 4 桁ゼロ埋め)を 1 ファイルずつ作り、加えてマスター索引 `index.json` を置く。各連番ファイルは `result` がその URL 単体の content アイテム(リストではない)で、必ず `title` を持つ `ResultEnvelope`。`index.json` が唯一の url↔ファイル対応表。
-- **単一(single)**: `research` → `research.json`。research レポートは分割しない。
+- **discovery は一覧で skim するもの**なので集約(分割すると一覧性が消える)。**content は 1 件ずつ読むもの**なので分割 + `.md`(JSON にエスケープされた本文より桁違いに読める)。
+- 連番 `NNNN` は**サブフォルダごとに独立**して採番し、既存をスキャンして `max+1` で**継続(追記)**する。同じクエリ再実行 → `search/` に別ファイルが増える。同じ URL 再 extract → `pages/` に別 `.md` + index に別エントリ(**重複も保持**)。
+- ファイル名 `NNNN-<slug>` の `slug` はクエリ / ドメイン / タイトル由来なので、**開かなくても中身が分かる**(`ls <topic>/` が索引になる)。
+- 索引 `index.json` は **`pages/` にだけ**置く(content は分割 + 大きく、url/由来をファイル名だけで辿れないため)。discovery / report はファイル名が自己説明的なので索引なし。
+- **合成コマンド** `search-extract` / `map-extract` は discovery 半分も残す: 検索 / map のメニューを `search/` / `map/` に、抽出本文を `pages/` に**両方**書く(「何を見て何を取ったか」を後から辿れる)。
 
 レイアウト例:
 
 ```text
-temp/web/                         ← TAVILY_OUTPUT_DIR(.env)
-└── msfabric_overview/            ← <topic>
-    ├── search.json               ← 集約(search)
-    ├── map.json                  ← 集約(map)
-    ├── research.json             ← 単一(research)
-    ├── index.json                ← 分割: マスター索引
-    ├── 0001.json                 ← 分割: 1 URL の本文
-    └── 0002.json
+temp/web/                                   ← TAVILY_OUTPUT_DIR(.env)
+└── msfabric_overview/                      ← <topic>(調査タスクの作業場)
+    ├── search/                             ← discovery: 1 クエリ = 1 ファイル
+    │   ├── 0001-microsoft-fabric-overview.json
+    │   └── 0002-fabric-vs-synapse.json
+    ├── map/                                ← discovery: 1 map = 1 ファイル
+    │   └── 0001-learn-microsoft-com.json
+    ├── pages/                              ← content: 1 ページ = 1 .md
+    │   ├── 0001-onelake-documentation.md
+    │   ├── 0002-medallion-lakehouse.md
+    │   └── index.json                      ← url ↔ file ↔ title ↔ 由来コマンド の対応表
+    └── research/                           ← report: 1 問い = 1 .md
+        └── 0001-how-does-obo-work.md
 ```
 
-`index.json` の形(content 系コマンドが書く。1 URL = 1 エントリ):
+`pages/index.json` の形(content 系が append。1 ページ = 1 エントリ):
 
 ```json
 {
-  "script": "crawl_site_content.py",
-  "result_kind": "crawl_results",
   "topic": "msfabric_overview",
   "entries": [
-    {"file": "0001.json", "url": "https://…", "title": "…", "title_source": "html|existing|url_fallback", "exit_code": 0}
+    {"file": "0001-onelake-documentation.md", "url": "https://…", "title": "…",
+     "title_source": "html|existing|url_fallback", "script": "extract_url_content.py",
+     "result_kind": "extract_results", "exit_code": 0}
   ]
 }
 ```
 
-- `title` は content 系で必ず埋まる。既にタイトルがあれば保持(`title_source:"existing"`)、欠けていれば HTML を直接 Fetch して補完(`"html"`、失敗時は URL 由来のスラッグで `"url_fallback"`)。Tavily はタイトル取得に使わない。
-- 同じコマンドを同じ `--topic` で再実行すると、各ファイルと `index.json` を上書きする(直近の実行を正とする)。
+- `title` は content 系で必ず埋まる。既にタイトルがあれば保持(`existing`)、欠けていれば HTML を直接 Fetch して補完(`html`、失敗時は URL 由来スラッグで `url_fallback`)。Tavily はタイトル取得に使わない。
+- discovery / content / report のいずれも、トピックファイルに書くのは**調査に必要な列だけ**(投影)。search 行は `url`/`title`/`content`/`score`(`raw_content` は落とす)、page は `# title` + 本文(images/メタは持ち込まない)。生の全フィールドは監査ログに残る。
 
 例(コマンド):
 
-- `tav search "Microsoft Fabric overview" --include-domain learn.microsoft.com --topic msfabric_overview` → `temp/web/msfabric_overview/search.json`
-- `tav map-extract https://learn.microsoft.com/azure/api-management/ --topic apim_docs` → `temp/web/apim_docs/0001.json …` + `index.json`
+- `tav search "Microsoft Fabric overview" --include-domain learn.microsoft.com --topic msfabric_overview` → `temp/web/msfabric_overview/search/0001-microsoft-fabric-overview.json`
+- `tav map-extract https://learn.microsoft.com/azure/api-management/ --topic apim_docs` → `temp/web/apim_docs/map/0001-learn-microsoft-com.json` + `pages/NNNN-<title>.md …` + `pages/index.json`
 
 ## 出力エンベロープと終了コード
 
@@ -166,18 +168,18 @@ temp/web/                         ← TAVILY_OUTPUT_DIR(.env)
 { "script": "...", "result_kind": "search_results", "exit_code": 0, "result": [ /* 本体 */ ] }
 ```
 
-- 出力先は `--topic` の有無で決まる。`--topic <name>` 指定時はトピックフォルダ配下のファイル(上記レイアウト)へ、未指定時は単一 `ResultEnvelope` を stdout へ出す。`--output` は廃止した。
-- 後段で結果を読むサブエージェントは、必ず **トップレベルの `result` を取り出してから** 中身を処理する。
-- content 系(分割レイアウト: `extract` / `crawl` / `search-extract` / `map-extract`)を `--topic` で受けた場合は、**まず `index.json` を読み、各エントリの `file`(`0001.json` …)を順に開く**。各連番ファイルは `result` がその URL 単体の content アイテムで、必ず `title` を持つ。集約系(`search.json` / `map.json`)・単一系(`research.json`)はそのファイル 1 つを読めばよい。
-- `result_kind` が `result` の読み方を示す: `search_results` / `extract_results` / `crawl_results`(`list[dict]`)、`site_pages`(`list[dict]`、タイトル記録)、`research_report`(`str` 本文 or `dict`)。分割レイアウトの連番ファイルでは `result` が単一アイテム(リストではない)。
-- `exit_code` でファイル単体でも成否が分かる。`0`=成功、`2`/`3`=API キー不備、`4`=抽出対象 URL が 0 件(`search_extract`/`map_extract`)、`5`=research がタイムアウト、`1`=その他失敗。
-- 全実行のフル詳細(リクエスト/レスポンス)は `src/logs/<script>-log.json` に別途残る。`.env` の `TAVILY_WRITE_LOG`(未設定=`true`、`false`/`0`/`no`/`off`/空で抑止)でこの監査ログ出力をトグルできる。
-
-正本は `src/tavily_common.py` の `ExitCode` / `ResultKind` / `ResultEnvelope`。詳細表は [src/README.md](src/README.md) の「実行結果の戻り値(契約)」。
+- 出力先は `--topic` の有無で決まる。`--topic <name>` 指定時はトピックフォルダ配下の役割サブフォルダ(上記レイアウト)へ、未指定時は単一 `ResultEnvelope`(投影済み)を stdout へ出す。
+- `--topic` 未指定で stdout を読むサブエージェントは、必ず **トップレベルの `result` を取り出してから** 中身を処理する。
+- `--topic` 指定時の読み方は**役割で違う**:
+  - **discovery**(`search/` / `map/`): 各 `NNNN-<slug>.json` は `result` がリストの `ResultEnvelope`。ファイル名で何のタスクか分かる。
+  - **content**(`pages/`): **まず `pages/index.json` を読み**、各エントリの `file`(`NNNN-<title>.md`)を順に開く。`.md` は `# <title>` + 本文(JSON ではなくそのまま読める)。`index.json` が唯一の url↔file 対応表。
+  - **report**(`research/`): `NNNN-<question>.md` をそのまま通読(失敗時のみ `.json`)。
+- `result_kind` が `result` の読み方を示す: `search_results` / `extract_results` / `crawl_results`(`list[dict]`)、`site_pages`(`list[dict]`、タイトル記録)、`research_report`(`str` 本文 or `dict`)。
+- `exit_code` でファイル単体でも成否が分かる(discovery/report の `.json`)。`0`=成功、`2`/`3`=API キー不備、`4`=抽出対象 URL が 0 件(`search_extract`/`map_extract`)、`5`=research がタイムアウト、`1`=その他失敗。
+- 全実行のフル詳細(リクエスト/レスポンス、投影前の生フィールド込み)は `src/logs/<script>-log.json` に別途残る。`.env` の `TAVILY_WRITE_LOG`(未設定=`true`、`false`/`0`/`no`/`off`/空で抑止)で監査ログをトグルできる。
+- stderr の「Wrote … to <path>」パス通知は `.env` の `TAVILY_SHOW_OUTPUT_PATHS`(未設定=`true`、falsey で抑止)でトグルできる(ファイル書き込み・stdout 契約は不変)。
 
 ## 並列実行・レート・コストの扱い
-
-Tavily の credit 消費量やレート制限は、プラン、API、詳細度、将来の仕様変更で変わりうる。正確な数値は Tavily の公式ドキュメントやダッシュボードを必ず確認すること。このスキルには固定の credit 数を埋め込まない。
 
 このリポジトリでの運用上の目安は以下。
 
@@ -194,24 +196,24 @@ Tavily の credit 消費量やレート制限は、プラン、API、詳細度�
 
 ### 1. キーワード起点で調べる
 
-ここが最も呼び出し頻度が高い起点。特に迷ったら、まず `src/search_topic.py` を使う。
+ここが最も呼び出し頻度が高い起点。特に迷ったら、まず `tav search` を使う。
 
-| 区分 | スクリプト | 概要 | 使う場面 |
+| 区分 | コマンド | 概要 | 使う場面 |
 |------|------|------|------|
-| 1.a | `src/search_topic.py` | `search` 単体を実行する最小ラッパー。詳細度プリセットと必要最小限のドメインフィルタだけ公開する。 | 関連 URL とスニペットをまず確認したい場合。初手として最も無難。 |
-| 1.b | `src/search_extract_topic.py` | `search` で候補 URL を集め、返ってきた URL をそのまま `extract` に渡して本文を取得する。`src/search_topic.py` と `src/extract_url_content.py` の再利用で構成する。 | まず関連ページを把握し、その後に根拠ページ本文まで明示的に確認したい場合。 |
-| 1.c | `src/research_topic.py` | `research` を使って調査タスクを投げ、完了まで待ってレポートを JSON で返す最小ラッパー。モデル選択と待機設定は詳細度プリセットで管理する。 | キーワードや問いに対して、単発検索ではなく AI に調査と要約までまとめて任せたい場合。 |
+| 1.a | `tav search` | `search` 単体を実行する最小ラッパー。詳細度プリセットと必要最小限のドメインフィルタだけ公開する。 | 関連 URL とスニペットをまず確認したい場合。初手として最も無難。 |
+| 1.b | `tav search-extract` | `search` で候補 URL を集め、返ってきた URL をそのまま `extract` に渡して本文を取得する。`tav search` と `tav extract` の再利用で構成する。 | まず関連ページを把握し、その後に根拠ページ本文まで明示的に確認したい場合。 |
+| 1.c | `tav research` | `research` を使って調査タスクを投げ、完了まで待ってレポートを JSON で返す最小ラッパー。モデル選択と待機設定は詳細度プリセットで管理する。 | キーワードや問いに対して、単発検索ではなく AI に調査と要約までまとめて任せたい場合。 |
 
 ### 2. URL 起点で調べる
 
-| 区分 | スクリプト | 概要 | 使う場面 |
+| 区分 | コマンド | 概要 | 使う場面 |
 |------|------|------|------|
-| 2.a | `src/extract_url_content.py` | 1つ以上の URL を対象に `extract` を実行する最小ラッパー。詳細度プリセットで Tavily の抽出設定を内包する。 | 対象 URL がすでに決まっており、全文または特定話題に絞った内容をすぐ取得したい場合。 |
+| 2.a | `tav extract` | 1つ以上の URL を対象に `extract` を実行する最小ラッパー。詳細度プリセットで Tavily の抽出設定を内包する。 | 対象 URL がすでに決まっており、全文または特定話題に絞った内容をすぐ取得したい場合。 |
 
 ### 3. サイト起点で網羅的に調べる
 
-| 区分 | スクリプト | 概要 | 使う場面 |
+| 区分 | コマンド | 概要 | 使う場面 |
 |------|------|------|------|
-| 3.a | `src/map_site_titles.py` | `map` で URL 一覧を取得し、各ページの HTML からタイトルを自動取得して一覧化する。失敗時は URL 由来のフォールバック名を返す。 | サイト内ページの一覧や構造を確認しつつ、後段の処理を自分で細かく制御したい場合。 |
-| 3.b | `src/crawl_site_content.py` | `crawl` を 1 ステップで実行する最小ラッパー。詳細度プリセットでクロール深さ・抽出品質を内包し、`--query` は内部で `instructions` に変換して関連内容を優先取得する。 | サイト全体から関連ページ本文をまとめて収集したい場合。 |
-| 3.c | `src/map_extract_site_content.py` | `map` で候補 URL を取得し、その URL 群に対して `extract` を実行する合成ラッパー。`map_site_titles.py` と同じフィルタ引数を維持しつつ、抽出対象を最大 20 URL に絞る。 | 取得対象 URL をいったん見極めてから、必要なページだけ抽出したい場合。 |
+| 3.a | `tav map` | `map` で URL 一覧を取得し、各ページの HTML からタイトルを自動取得して一覧化する。失敗時は URL 由来のフォールバック名を返す。 | サイト内ページの一覧や構造を確認しつつ、後段の処理を自分で細かく制御したい場合。 |
+| 3.b | `tav crawl` | `crawl` を 1 ステップで実行する最小ラッパー。詳細度プリセットでクロール深さ・抽出品質を内包し、`--query` は内部で `instructions` に変換して関連内容を優先取得する。 | サイト全体から関連ページ本文をまとめて収集したい場合。 |
+| 3.c | `tav map-extract` | `map` で候補 URL を取得し、その URL 群に対して `extract` を実行する合成ラッパー。`tav map` と同じフィルタ引数を維持しつつ、抽出対象を `--detail` の `map_limit`(`quick`=10 / `balanced`=20 / `max`=40)件に絞る。 | 取得対象 URL をいったん見極めてから、必要なページだけ抽出したい場合。 |

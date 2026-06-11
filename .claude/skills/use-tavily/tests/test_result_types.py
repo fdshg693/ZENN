@@ -40,8 +40,10 @@ from tavily_common import (  # noqa: E402
     ExtractFailedItem,
     ExtractResultItem,
     ResearchSource,
+    ResultKind,
     SearchResultItem,
     SitePageItem,
+    slim_result_item,
 )
 
 NoneType = type(None)
@@ -189,6 +191,48 @@ class TestFixtureShapes(unittest.TestCase):
         # The script emits ``content`` (markdown str) as the RESEARCH_REPORT result.
         self.assertIsInstance(resp["content"], str)
         assert_items(self, resp.get("sources") or [], ResearchSource)
+
+
+# ---------------------------------------------------------------------------
+# Projection (PLAN.md §4③): what reaches topic files / stdout is the slimmed
+# item, NOT the raw *Item. The raw types above stay the validation source of
+# truth; here we prove the projection keeps the research-relevant keys and drops
+# the noise, run over the SAME real captured fixtures.
+# ---------------------------------------------------------------------------
+class TestProjection(unittest.TestCase):
+    def test_search_projection_drops_raw_content(self) -> None:
+        resp = load_fixture("search_response.json")
+        for raw in resp["results"]:
+            slim = slim_result_item(ResultKind.SEARCH_RESULTS, raw)
+            self.assertEqual(set(slim), {"url", "title", "content", "score"})
+            self.assertNotIn("raw_content", slim)  # always None under our flags
+            # score is retained (decided), and identity/content survive.
+            self.assertEqual(slim["url"], raw["url"])
+
+    def test_extract_projection_drops_images(self) -> None:
+        resp = load_fixture("extract_response.json")
+        for raw in resp["results"]:
+            slim = slim_result_item(ResultKind.EXTRACT_RESULTS, raw)
+            self.assertEqual(set(slim), {"url", "title", "raw_content"})
+            self.assertNotIn("images", slim)
+
+    def test_crawl_projection_is_url_and_body(self) -> None:
+        resp = load_fixture("crawl_response.json")
+        for raw in resp["results"]:
+            slim = slim_result_item(ResultKind.CRAWL_RESULTS, raw)
+            self.assertLessEqual(set(slim), {"url", "raw_content"})
+            self.assertIn("url", slim)
+
+    def test_site_pages_projection_drops_fetch_metadata(self) -> None:
+        for raw in load_fixture("site_pages.json"):
+            slim = slim_result_item(ResultKind.SITE_PAGES, raw)
+            self.assertLessEqual(set(slim), {"url", "title", "short_title"})
+            for dropped in ("title_source", "final_url", "content_type", "status_code", "error"):
+                self.assertNotIn(dropped, slim)
+
+    def test_research_report_str_passes_through(self) -> None:
+        # A research report is a single str (or failure dict): no per-item projection.
+        self.assertEqual(slim_result_item(ResultKind.RESEARCH_REPORT, "# Report"), "# Report")
 
 
 # ---------------------------------------------------------------------------

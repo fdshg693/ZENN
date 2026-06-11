@@ -23,6 +23,7 @@ from typing import Any
 from tavily.errors import InvalidAPIKeyError
 
 from tavily_common import (
+    TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,
     RunOutcome,
@@ -58,7 +59,13 @@ TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Run Tavily research with minimal arguments and wait for completion."
+        description="Run Tavily research with minimal arguments and wait for completion.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Role: report. With --topic NAME, appends one report to\n"
+            "<TAVILY_OUTPUT_DIR>/NAME/research/NNNN-<question>.md (success) or .json (failure).\n"
+            "Omit --topic to print one ResultEnvelope to stdout."
+        ),
     )
     parser.add_argument(
         "input",
@@ -72,7 +79,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--topic",
-        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
+        help=TOPIC_ARG_HELP,
     )
     return parser.parse_args(argv)
 
@@ -182,6 +189,7 @@ def main(argv: Sequence[str] | None = None) -> RunOutcome:
         log=payload,
         result_kind=ResultKind.RESEARCH_REPORT,
         result=final_response.get("content") or final_response,
+        slug=args.input,
         message=describe_outcome(exit_code, final_status),
     )
 

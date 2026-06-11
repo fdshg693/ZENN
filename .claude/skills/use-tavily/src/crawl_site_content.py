@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 from tavily.errors import InvalidAPIKeyError
 
 from tavily_common import (
+    TOPIC_ARG_HELP,
     ExitCode,
     ResultKind,
     RunOutcome,
@@ -69,7 +70,13 @@ INCLUDE_USAGE = False
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Crawl a site with Tavily and return collected page content."
+        description="Crawl a site with Tavily and return collected page content.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Role: content. With --topic NAME, writes one Markdown page per crawled URL\n"
+            "to <TAVILY_OUTPUT_DIR>/NAME/pages/NNNN-<title>.md (split, one page = one file),\n"
+            "indexed by pages/index.json. Omit --topic to print one ResultEnvelope to stdout."
+        ),
     )
     parser.add_argument(
         "url",
@@ -121,7 +128,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--topic",
-        help="Output topic folder under TAVILY_OUTPUT_DIR. Omit to print a single ResultEnvelope to stdout.",
+        help=TOPIC_ARG_HELP,
     )
     return parser.parse_args(argv)
 

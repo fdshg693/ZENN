@@ -1,27 +1,17 @@
 ---
-# Version 2.0.0
+# Version 3.0.0
 name: zenn
 description: ZENN記事を、事前調査→概要提案→ユーザー承認→調査→plan→承認→publish の順で進めるスキル
 disable-model-invocation: false
 user-invocable: true
 
-# use-tavilyスキルを前提
-# - 同階層(.claude/skills/use-tavily/.env)に有効なTAVILY_API_KEYの設定が必要
-# - Python が使える環境
-# - tavily / python-dotenv がグローバルにインストールされていること
-# - 短縮コマンド tav を使うには、初回のみ `pip install -e .claude/skills/use-tavily` を実行する
-#
-# use-tavily の Python スクリプトが読む .env 設定で、本スキルが前提とする値:
-# - TAVILY_OUTPUT_DIR は未設定(=既定 temp/web)または temp/web であること。
-#   本スキルは調査結果を temp/web/<topic>/ から読む前提で書かれているため、別ディレクトリに
-#   変更すると --topic で出した先と読みに行く先が食い違う(齟齬の原因)。変更する場合は
-#   本スキル内の temp\web\... 参照も合わせて読み替えること。
-# - TAVILY_OUTPUT_DIR の相対パスは「コマンド実行時のカレントディレクトリ」基準で解決される。
-#   よって tav / スクリプトは必ずリポジトリルートから実行する(そうすれば ./temp/web/<topic>/ に出る)。
-# - TAVILY_WRITE_LOG は任意(未設定=true で logs/<script>-log.json を残す。記事執筆では参照不要なので false にしてもよい)。
+# 前提: use-tavily スキル。外部情報の収集はすべてこのスキル経由で行う。
+# - 導入条件・前提・各コマンドの使い方・詳細度プリセット・出力の読み方は use-tavily スキルに従う(本スキルでは再掲しない)。
+# - 本スキルは「1 記事 = 1 トピック」で調査を蓄積する。記事ごとに短いトピックスラッグ {article_topic}
+#   (英数字と _)を 1 つ決め、use-tavily の全コマンドで同じ --topic {article_topic} を使い回す。
+#   調査結果は use-tavily が同じトピックフォルダに追記していくので、1 フォルダに集約される。
 
-# 関連スキルとして、zenn-refineスキルがある。
-# - このスキルの後続として使うことで、本番ZENN記事に近い質のアウトプットを目指すことができる
+# 関連スキル: zenn-refine(本スキルの後続として使うと、本番 ZENN 記事に近い品質を目指せる)。
 ---
 
 以下の手順で ZENN 記事を作成してください。
@@ -32,7 +22,7 @@ user-invocable: true
 
 進行順は必ず次の通りです。
 
-1. `use-tavily` の前提確認を行う
+1. 外部調査は use-tavily スキルを使う前提を確認する
 2. 軽い事前調査を行う
 3. 概要を提案する
 4. **ユーザー承認を待つ**
@@ -63,36 +53,25 @@ user-invocable: true
 
 重要:
 
-- 外部情報の収集は、基本的にすべて `.claude\skills\use-tavily` 配下のスクリプトを使って行うこと。
-- 一般的な WEB 検索ツールや曖昧なブラウズ指示ではなく、`use-tavily` スキルの各スクリプトを明示的に使い分けること。
-- 既存知識だけで記事を書かないこと。概要提案の段階でも、調査が必要なら Tavily で最新情報を確認すること。
+- 外部情報の収集は、**基本的にすべて use-tavily スキルを使って**行うこと。
+- 一般的な WEB 検索ツールや曖昧なブラウズ指示ではなく、use-tavily スキルの各コマンドを明示的に使い分けること。
+- 既存知識だけで記事を書かないこと。概要提案の段階でも、調査が必要なら use-tavily で最新情報を確認すること。
 - どの工程でも、まず対象トピックに対して「何を知るための調査か」を明確にしてから検索・抽出を行うこと。
 
 ## 0. 事前確認
 
-まず `.claude\skills\use-tavily\SKILL.md` を読み、このスキルを使う前提で進めてください。外部情報の収集は短縮コマンド `tav <サブコマンド>` で呼ぶ(未インストール環境では従来どおり `python .\.claude\skills\use-tavily\src\<script>.py` でも可)。
+外部情報の収集は**すべて use-tavily スキルを使って**行います。コマンドの使い方・詳細度プリセット・出力の読み方は use-tavily スキルに従ってください(本スキルでは再掲しません)。一般的な WEB 検索ツールや、Python などで直接 HTML を取りに行く方法は使わないでください。
 
-前提設定の確認(齟齬防止): `.claude\skills\use-tavily\.env` の `TAVILY_OUTPUT_DIR` が未設定または `temp/web` であることを確認する(本スキルは `temp/web/<topic>/` から結果を読む)。別値なら、本スキル内の `temp\web\...` 参照をその値に読み替えるか、`.env` を `temp/web` に揃える。コマンドは必ずリポジトリルートから実行する(相対パスはカレントディレクトリ基準で解決されるため)。
+### 0 の鉄則: 1 記事 = 1 トピックに蓄積する
 
-利用する主なコマンド:
+調査資料を散らさないために、**記事ごとにトピックを 1 つだけ**使い回します。
 
-- `tav search`: キーワードから関連 URL を探す
-- `tav search-extract`: キーワードから関連 URL を探し、そのまま内容も抽出する
-- `tav research`: 調査タスクをまとめて Tavily に任せる
-- `tav extract`: 既知の URL 群から内容を抽出する
-- `tav map`: 公式 Docs サイト内の URL 一覧とタイトルを把握する
-- `tav map-extract`: サイトをマップしてから対象 URL の内容を抽出する
-- `tav crawl`: 特定サイトを直接クロールして内容を集める
+- 記事ごとに短いトピックスラッグ `{article_topic}`(英数字と `_`)を **1 つだけ**決める。
+- use-tavily の**全コマンドで同じ `--topic {article_topic}` を渡す**。事前調査・本格調査・追加調査・research をまたいでも、**毎回トピックを変えない**こと。
+- こうすると use-tavily が同じトピックフォルダに**追記**していくので、その記事の調査資料(検索メニュー・抽出本文・research レポート)が**1 フォルダに集約**される。
+- 追加調査の前に、**まずそのトピックフォルダの既存資料を見て**、すでに分かっていることを再利用し、**足りない論点だけ**追加で調べる(同じことを何度も取りに行かない)。
 
-必要に応じて各コマンドの `tav <サブコマンド> --help` も確認してください。
-
-出力先はフルパスではなく `--topic <name>` で指定してください。記事ごとにトピック名のスラッグ(`{unique_name_per_article}`)を決め、各コマンドに `--topic {unique_name_per_article}` を渡します。実際の保存先は `<TAVILY_OUTPUT_DIR>/<topic>/`(既定 `temp\web\{unique_name_per_article}\`)に解決され、その配下に以下のレイアウトで書き出されます。
-
-- 集約系(`search` / `map`): `search.json` / `map.json`(url+title の一覧を 1 ファイルに集約)
-- 単一系(`research`): `research.json`(レポート 1 ファイル)
-- 分割系(`extract` / `search-extract` / `map-extract` / `crawl`): URL ごとに `0001.json`, `0002.json`, … + マスター索引 `index.json`
-
-`{unique_name_per_article}` は英数字と `_` を使った短い識別子に揃えてください。分割系の結果を読むときは、**まず `index.json` を開いて各エントリの `file`(`0001.json` …)と `url`/`title` を把握し、必要な連番ファイルを辿って**ください。集約系・単一系はそのファイル 1 つを読みます。
+> トピックフォルダの場所と、その中の資料(役割別サブフォルダ・索引・本文ファイル)の読み方は use-tavily スキルに従ってください。
 
 ## 0.a 記事ファイルの配置と frontmatter ルール
 
@@ -139,20 +118,20 @@ user-invocable: true
 
 ### 1.a 軽い事前調査の基本パターン
 
-まずは `search_topic.py` を使い、公式 Docs や GitHub がどこにあるかを確認してください。
+まずは `tav search` で、公式 Docs や GitHub がどこにあるかを確認してください。トピックは記事の `{article_topic}` を使います。
 
 例:
 
-```powershell
-tav search "Azure API Management OpenAI integration" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --topic {unique_name_per_article}
+```
+tav search "Azure API Management OpenAI integration" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --topic {article_topic}
 ```
 
-より「問い」に近いテーマで、概要までまとめてほしい場合は `research_topic.py` を使っても構いません。
+より「問い」に近いテーマで、概要までまとめてほしい場合は `tav research` を使っても構いません。
 
 例:
 
-```powershell
-tav research "Azure API Management で Azure OpenAI を公開する設計上のポイントを整理してください。公式 Docs と Github を優先し、記事概要の判断に必要な最新論点をまとめてください。" --detail balanced --topic {unique_name_per_article}
+```
+tav research "Azure API Management で Azure OpenAI を公開する設計上のポイントを整理してください。公式 Docs と Github を優先し、記事概要の判断に必要な最新論点をまとめてください。" --detail balanced --topic {article_topic}
 ```
 
 ### 1.b 軽い事前調査で止めてよいライン
@@ -166,10 +145,10 @@ tav research "Azure API Management で Azure OpenAI を公開する設計上の�
 
 通常は以下のどちらかで止めてよいです。
 
-- `search_topic.py` を 1 から 2 回実行する
-- または `research_topic.py` を 1 回実行する
+- `tav search` を 1 から 2 回実行する
+- または `tav research` を 1 回実行する
 
-同じ問いに対して `search_topic.py` を無目的に繰り返さないでください。追加検索は、**まだ未確定な論点を 1 文で言える場合だけ** 行ってください。
+同じ問いに対して `tav search` を無目的に繰り返さないでください。追加検索は、**まだ未確定な論点を 1 文で言える場合だけ** 行ってください。
 
 ### 1.c 本格調査へ進む条件
 
@@ -192,7 +171,7 @@ tav research "Azure API Management で Azure OpenAI を公開する設計上の�
 
 ## 2. 概要提案が受け入れられたら、本格調査を行う
 
-既存知識だけで回答しようとしないでください。必ず Tavily を使って最新情報を収集してください。
+既存知識だけで回答しようとしないでください。必ず use-tavily を使って最新情報を収集してください。**事前調査と同じ `--topic {article_topic}`** を使い、同じフォルダに調査を積み増します。
 
 - **この工程は、概要提案に対するユーザー承認のあとで開始すること。**
 
@@ -208,7 +187,7 @@ tav research "Azure API Management で Azure OpenAI を公開する設計上の�
 以下なら、まずメインエージェントで進めてください。
 
 - 調査対象が 1 つの製品群、または 1 つの比較テーマに収まる
-- `search` / `extract` を 1 から 3 回回せば足りる見込み
+- `tav search` / `tav extract` を 1 から 3 回回せば足りる見込み
 - 候補 URL が 10 本前後で、人手で十分に選別できる
 - 構成提案から本文統合まで同じ文脈で進めたほうが速い
 
@@ -221,45 +200,48 @@ tav research "Azure API Management で Azure OpenAI を公開する設計上の�
 
 迷ったら、**最初の軽い調査はメインエージェントで行い、独立しやすい URL トリアージやセクション下書きだけサブエージェントに切り出す** 方針を基本にしてください。
 
+サブエージェントに切り出す場合も、**同じ `--topic {article_topic}` を使い回させて**、成果を 1 フォルダに集約してください(トピックを分けると資料が散ります)。
+
 ### 2.b サブエージェントに URL 候補の洗い出しをさせる
 
-サブエージェントには「WEB検索して」とだけ言わず、`.claude\skills\use-tavily` を使うように明示してください。
+サブエージェントには「WEB 検索して」とだけ言わず、**use-tavily スキルを使う**よう明示し、トピックは記事と同じ `{article_topic}` を渡させてください。
 
 サブエージェント指示例:
 
 ```markdown
-`.claude\skills\use-tavily\SKILL.md` を先に読んでください。
+外部調査には use-tavily スキルを使ってください(一般的な WEB 検索ツールは使わない)。
 
 {keyword1 keyword2 ...} に関する最新の情報を収集してください。
-一般的な WEB 検索ツールではなく、`tav search` または必要に応じて `tav research` を使ってください(`.claude\skills\use-tavily\SKILL.md` 参照)。
-
 まずは参考になる公式 Docs や GitHub を確定させてください。
-そのうえで、公式 Docs を中心に参照すべき URL とそれらのタイトルを整理し、`temp\{unique_name_per_article}\search_{keyword1_keyword2_...}.md` に保存してください。(`tav` の出力をそのまま使うのでなく、トピックフォルダ `temp\web\{unique_name_per_article}\` 配下の結果を読み、不要箇所の削除等を行って読みやすい形に整形してください)
+そのうえで、公式 Docs を中心に参照すべき URL とそれらのタイトルを整理してください。
 
-可能なら include-domain を使って公式ドメインを優先してください。
+- すべてのコマンドで `--topic {article_topic}` を使い回す(資料を 1 フォルダに集約するため)
+- 可能なら include-domain で公式ドメインを優先する
+- use-tavily が蓄積した結果を読み、不要箇所を削除して読みやすく整形した要約を返す
+
 最終報告では以下を返してください。
 
 - 実行したコマンド
 - 確定した主要ドメイン
-- 重要 URL 一覧
-- 出力ファイルパス
+- 重要 URL 一覧(タイトル付き)
+- 不確実な点 / 追加調査が要る論点
 ```
 
 推奨コマンド例:
 
-```powershell
-tav search "Azure API Management policy expressions" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --topic {unique_name_per_article}
+```
+tav search "Azure API Management policy expressions" --detail balanced --include-domain learn.microsoft.com --include-domain github.com --topic {article_topic}
 ```
 
 広めに調査して論点整理も必要なら:
 
-```powershell
-tav research "Azure API Management policy expressions の最新情報を整理してください。公式 Docs と Github を優先し、記事執筆で先に読むべき資料を洗い出してください。" --detail balanced --topic {unique_name_per_article}
+```
+tav research "Azure API Management policy expressions の最新情報を整理してください。公式 Docs と Github を優先し、記事執筆で先に読むべき資料を洗い出してください。" --detail balanced --topic {article_topic}
 ```
 
 ### 2.c URL 候補から、読むべき資料を特定する
 
-トピックフォルダ配下の `search.json`(集約系)や `research.json`(単一系)を読み、記事を書くために本文まで確認すべき URL を選定してください。
+トピック `{article_topic}` のフォルダに溜まった検索メニュー(`tav search` / `tav map`)や research レポートを読み、記事を書くために本文まで確認すべき URL を選定してください(各資料の読み方は use-tavily スキルに従う)。
 
 選定の基準:
 
@@ -270,50 +252,40 @@ tav research "Azure API Management policy expressions の最新情報を整理�
 
 ### 2.d URL 内容の取得方法を使い分ける
 
-URL がすでに決まっている場合は `extract_url_content.py` を使ってください。
+取得手段は対象に応じて使い分けます(各コマンドの詳細・引数は use-tavily スキル参照)。いずれも `--topic {article_topic}` を付けて同じフォルダに蓄積します。
 
-例:
+- URL がすでに決まっている → `tav extract`
+- キーワードから候補 URL の抽出まで一気に → `tav search-extract`
+- 公式 Docs サイト全体の構造を先に見たい → `tav map`
+- サイトをマップしてから対象 URL の本文を取る → `tav map-extract`
+- 特定サイトを直接クロールして広く拾う → `tav crawl`
 
-```powershell
-tav extract https://learn.microsoft.com/azure/api-management/api-management-policies https://learn.microsoft.com/azure/api-management/api-management-policy-expressions --query "APIM policy で何ができるか、制約、実務上重要な注意点" --detail balanced --topic {unique_name_per_article}
+例(URL 既知 → 本文抽出):
+
+```
+tav extract https://learn.microsoft.com/azure/api-management/api-management-policies https://learn.microsoft.com/azure/api-management/api-management-policy-expressions --query "APIM policy で何ができるか、制約、実務上重要な注意点" --detail balanced --topic {article_topic}
 ```
 
-キーワードから候補 URL の抽出まで含めて一気に行いたい場合は `search_extract_topic.py` を使ってください。
+例(キーワード → 候補 URL → 本文抽出):
 
-例:
-
-```powershell
-tav search-extract "Azure API Management policy expressions limitations" --detail balanced --include-domain learn.microsoft.com --topic {unique_name_per_article}
+```
+tav search-extract "Azure API Management policy expressions limitations" --detail balanced --include-domain learn.microsoft.com --topic {article_topic}
 ```
 
-公式 Docs サイト全体の構造を先に見たい場合は `map_site_titles.py` を使ってください。
+例(サイト構造の把握 / サイトから本文収集):
 
-例:
-
-```powershell
-tav map https://learn.microsoft.com/azure/api-management/ --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --topic {unique_name_per_article}
+```
+tav map https://learn.microsoft.com/azure/api-management/ --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --topic {article_topic}
+tav map-extract https://learn.microsoft.com/azure/api-management/ --query "self-hosted gateway architecture, limitations, pricing-related considerations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --topic {article_topic}
 ```
 
-特定サイトから関連ページ本文をまとめて収集したい場合は `map_extract_site_content.py` を使ってください。
-
-例:
-
-```powershell
-tav map-extract https://learn.microsoft.com/azure/api-management/ --query "self-hosted gateway architecture, limitations, pricing-related considerations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --topic {unique_name_per_article}
-```
-
-サイト全体を直接クロールしたい場合は `crawl_site_content.py` を使ってください。対象サイトが限定されていて、関連情報を広く拾いたい場合に向いています。
-
-例:
-
-```powershell
-tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace feature, v2 tiers, current limitations" --detail balanced --select-domain learn.microsoft.com --select-path "/azure/api-management/.*" --topic {unique_name_per_article}
-```
+> `--query` を付けた抽出は本文全体ではなく query 関連チャンクだけを返します。本文を丸ごと取りたいときの扱いや、`--detail` の使い分けは use-tavily スキルに従ってください。
 
 ### 2.e 追加調査の原則
 
-- 情報が足りない論点だけ追加で検索すること
-- 追加調査も `use-tavily` のスクリプトを使うこと
+- 情報が足りない論点だけ追加で調査すること
+- 追加調査も use-tavily スキルを使い、`--topic {article_topic}` を使い回すこと
+- 追加調査の前に、まずトピックフォルダの既存資料を見直して重複を避けること
 - 追加検索のたびに、何を確認したかったかを明示すること
 - 同じ URL を何度も雑に取得せず、必要ならクエリを変えて抽出し直すこと
 
@@ -322,7 +294,7 @@ tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace f
 - 2 で収集した情報をもとに、記事の構成を提案してください。
 - 構成だけでなく、各セクションの概要も記述してください。
 - それぞれのセクションで参考にすべき URL を示してください。
-- 可能であれば、どの収集ファイルを根拠にしたかも併記してください。
+- 可能であれば、どの収集資料を根拠にしたかも併記してください。
 - **記事は、`zenn\plan`配下のファイルとして出力してください。**
   - こうすることで、ユーザーがコメントをつけやすくなります。
 
@@ -345,50 +317,44 @@ tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace f
   - `zenn\publish`配下のファイルとして出力してください。
 - 収集済みの資料を根拠にして書き、根拠が薄いことを推測で埋めないでください。
 - 必要に応じてサブエージェントを使い、セクション単位で下書きを作らせてください。
-- サブエージェントにも、一般的な WEB 検索ではなく `use-tavily` のスクリプトを使う方針を守らせてください。
+- サブエージェントにも、一般的な WEB 検索ではなく use-tavily スキルを使う方針を守らせてください。
 
 ### 4.a セクション下書きをサブエージェントに任せる場合の指示例
 
 ```markdown
-`.claude\skills\use-tavily\SKILL.md` を先に読んでください。
-
 以下の Zenn 記事セクションの下書きを作成してください。
 
 - セクション名: {section_title}
 - 記事全体のテーマ: {article_theme}
 - このセクションで答える問い: {section_goal}
-- 主に参照するファイル: {temp\web\{unique_name_per_article}\...(分割系は index.json から各 NNNN.json、集約/単一系は search.json/map.json/research.json)}
+- 参照する調査トピック: {article_topic}(use-tavily が蓄積したフォルダ。読み方は use-tavily スキル参照)
 - 主に参照する URL: {url1, url2, ...}
 
-まずは指定された JSON 調査結果と URL を読み、根拠を確認してください。
-根拠が不足する場合のみ、`tav extract` または `tav search-extract` を使って追加調査してください。
+まずは指定された調査結果と URL を読み、根拠を確認してください。
+根拠が不足する場合のみ、use-tavily スキルで(`tav extract` / `tav search-extract` 等、`--topic {article_topic}`)追加調査してください。
 一般的な WEB 検索ツールは使わないでください。
 
 出力では以下を返してください。
 
 - セクション下書き本文
 - 根拠として使った URL 一覧
-- 追加調査した場合はそのコマンドと出力ファイル
+- 追加調査した場合はそのコマンド
 - 不確実な点
 ```
 
-### 4.b 蓄積した調査 JSON から事実を抽出させる指示例
+### 4.b 蓄積した調査資料から事実を抽出させる指示例
 
-本格調査でトピックフォルダ `temp\web\{unique_name_per_article}\` の JSON が増えた段階では、メインエージェントで全て読むと文脈を圧迫します。この「事実抽出のみ」を Explore / 汎用サブエージェントに切り出すと効きます(Web 検索はさせず、既存 JSON の読解だけさせるのがポイント)。
+本格調査でトピック `{article_topic}` のフォルダに資料が増えた段階では、メインエージェントで全て読むと文脈を圧迫します。この「事実抽出のみ」を Explore / 汎用サブエージェントに切り出すと効きます(Web 検索はさせず、既存の蓄積資料の読解だけさせるのがポイント)。
 
 ```markdown
-以下の JSON 調査結果を読み、記事の各セクションに使う**具体的で検証可能な事実**を抽出してください。
-新しい検索は行わないでください。既に保存された JSON を読むだけです。
+トピック `{article_topic}` の調査結果を読み、記事の各セクションに使う**具体的で検証可能な事実**を抽出してください。
+新しい検索は行わないでください。既に蓄積された調査資料を読むだけです。
+資料の場所と読み方は use-tavily スキルに従ってください(検索メニュー → 各ページ本文の順に辿る)。
 
-- 対象フォルダ: `temp\web\{unique_name_per_article}\`
-  - 分割系(extract / crawl / search-extract / map-extract)は、まず `index.json` を開いて各エントリの `file`(`0001.json` …)と `url`/`title` を把握し、各 `NNNN.json` を辿って本文を読む
-  - 集約系・単一系は `search.json` / `map.json` / `research.json` をそのまま読む
 - 記事全体のテーマ: {article_theme}
 
-各結果オブジェクトは `url` と `content` / `raw_content` を持ちます(分割系の `NNNN.json` は `result` がその URL 単体のアイテムで、`title` も持ちます)。
-
 以下のセクションごとに、6〜15 個の事実を、各事実に**根拠 URL を inline で** 併記してください。
-具体的な数値(上限、SLA、レイテンシ、RU、料金)が本文に書かれている場合は必ず引用してください。
+具体的な数値(上限、SLA、レイテンシ、RU、料金)が資料に書かれている場合は必ず引用してください。
 
 セクション:
 
@@ -397,7 +363,7 @@ tav crawl https://learn.microsoft.com/azure/api-management/ --query "workspace f
 ...
 
 形式: セクション見出しごとに箇条書き。全体で 1800 語以下。
-JSON に載っていない事実は「not in files — need separate check」と明記し、推測で埋めないでください。
+資料に載っていない事実は「not in files — need separate check」と明記し、推測で埋めないでください。
 ```
 
 ### 4.c 記事執筆時の品質基準
@@ -415,3 +381,4 @@ JSON に載っていない事実は「not in files — need separate check」と
 - 一般的な WEB 検索ツールを優先しないこと
 - 公式ソースがあるのに、非公式ブログだけを根拠にしないこと
 - 根拠 URL が不足したまま構成や本文を書き進めないこと
+- 記事ごとにトピックを分散させないこと(1 記事 = 1 `--topic {article_topic}` に集約する)

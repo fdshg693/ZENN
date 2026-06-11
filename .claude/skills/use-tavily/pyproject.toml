@@ -16,7 +16,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "zenn-use-tavily"
-version = "2.0.0"
+version = "3.0.0"
 description = "Thin CLI wrappers around Tavily for the ZENN article-writing skill"
 requires-python = ">=3.11"
 dependencies = [
